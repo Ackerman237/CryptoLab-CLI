@@ -400,6 +400,7 @@ def navigation_menu(
         if banner:
             banner_text = pick_logo(width) if banner_responsive else banner
             print(center_block(banner_text.rstrip("\n"), width, offset=-4))
+            print()
         print(center_block(title[:max(20, width - 2)], width, offset=-4))
         print()
         sys.stdout.write("\033[s")
