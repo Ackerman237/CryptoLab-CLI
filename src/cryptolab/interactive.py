@@ -3214,7 +3214,6 @@ def _run_interactive_menu() -> None:
                 "Hex",
                 "Binary",
                 "Riwayat",
-                "Keluar",
             ],
             title=f"CRYPTOLAB CLI v{__version__} - TOOLKIT KRIPTOGRAFI & ENCODING",
             back_label="Keluar",
@@ -3230,11 +3229,8 @@ def _run_interactive_menu() -> None:
         try:
             if sel == 0:
                 handle_auto_analyze()
-            elif sel == 1:
-                handle_caesar()
-            elif sel == 2:
-                handle_vigenere()
-            elif sel == 3:
+            elif sel == 10:
+                handle_history()
                 handle_playfair()
             elif sel == 4:
                 handle_hill()
