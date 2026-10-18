@@ -64,6 +64,8 @@ from cryptolab.utils.history import log_history, read_history, clear_history, ge
 
 DIVIDER = "-" * 56
 THIN_DIVIDER = "." * 56
+HINTS_MAIN = [("↑↓", "navigasi"), ("enter", "pilih"), ("q", "keluar"), ("?", "bantuan")]
+HINTS_SUB = [("↑↓", "navigasi"), ("enter", "pilih"), ("esc", "kembali"), ("q", "keluar"), ("?", "bantuan")]
 LOGO_LARGE = """\
  ██████ ██████  ██    ██ ██████  ████████  ██████  ██       █████  ██████
 ██      ██   ██  ██  ██  ██   ██    ██    ██    ██ ██      ██   ██ ██   ██
@@ -220,6 +222,39 @@ def red(text: str) -> str:
     return color_text(text, "31")
 
 
+def emphasis(text: str) -> str:
+    return color_text(text, "1;97")
+
+
+def muted(text: str) -> str:
+    return color_text(text, "90")
+
+
+def _fit_hints(hints: List[Tuple[str, str]], width: int, gap: int = 3) -> List[Tuple[str, str]]:
+    """Keep the highest-priority footer hints that fit the terminal."""
+    chosen = list(hints)
+    while chosen:
+        plain = (" " * gap).join(f"{key} {label}" for key, label in chosen)
+        if len(plain) <= max(width, 20):
+            return chosen
+        chosen.pop()
+    return []
+
+
+def render_footer(hints: List[Tuple[str, str]], width: Optional[int] = None, gap: int = 3) -> str:
+    """Render compact keyboard hints with emphasized keys and muted labels."""
+    width = width or terminal_width()
+    gap = 1 if width < 40 else gap
+    chosen = _fit_hints(hints, width, gap)
+    plain = (" " * gap).join(f"{key} {label}" for key, label in chosen)
+    styled = (" " * gap).join(
+        f"{emphasis(key)} {muted(label)}" for key, label in chosen
+    )
+    padding = max((width - len(plain)) // 2, 0)
+    divider = "-" * max(20, width - 2)
+    return f"{center_block(divider, width)}\n{' ' * padding}{styled}"
+
+
 def safe_input(prompt: str, allow_back: bool = True) -> str:
     """Read line from user safely, handling back navigation and interruptions."""
     try:
@@ -370,12 +405,11 @@ def navigation_menu(
         sys.stdout.write("\033[s")
         for i, opt in enumerate(options):
             option_text = opt if len(opt) <= width - 8 else opt[:max(1, width - 11)] + "..."
-            prefix = green("  >> ") if i == selected else "     "
-            print(f"{prefix}{option_text}")
-        hints = "  ↑↓ navigasi  |  Enter pilih  |  ? bantuan  |  Q keluar"
-        if allow_back:
-            hints += f"  |  B/Esc {back_label.lower()}"
-        print(hints[:max(20, width - 2)])
+            if i == selected:
+                print(emphasis(f"  ▸ {option_text}"))
+            else:
+                print(muted(f"    {option_text}"))
+        print(render_footer(HINTS_SUB if allow_back else HINTS_MAIN, width))
         print()
         sys.stdout.flush()
         menu_rendered = True
@@ -386,8 +420,9 @@ def navigation_menu(
         sys.stdout.write("\033[u")
         for i, opt in enumerate(options):
             option_text = opt if len(opt) <= width - 8 else opt[:max(1, width - 11)] + "..."
-            prefix = green("  >> ") if i == selected else "     "
-            sys.stdout.write(f"\033[2K\r{prefix}{option_text}\n")
+            prefix = "  ▸ " if i == selected else "    "
+            styled = emphasis(prefix + option_text) if i == selected else muted(prefix + option_text)
+            sys.stdout.write(f"\033[2K\r{styled}\n")
         sys.stdout.flush()
 
     def show_help():
@@ -789,6 +824,371 @@ def handle_vigenere() -> None:
             print("\n" + card)
             if not post_result_menu(card, "hasil_vigenere.txt"):
                 break
+
+        except BackToMenu:
+            break
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def handle_playfair() -> None:
+    """Interactive handler for Playfair Cipher."""
+    while True:
+        sel = navigation_menu(
+            options=[
+                "Enkripsi (Plaintext -> Ciphertext)",
+                "Dekripsi (Ciphertext -> Plaintext)",
+            ],
+            title="CRYPTOLAB - PLAYFAIR CIPHER (5x5 Matrix)",
+            back_label="Kembali ke Menu Utama",
+        )
+        if sel is None:
+            break
+
+        try:
+            op_name = "Enkripsi" if sel == 0 else "Dekripsi"
+            text = safe_input(f"  Masukkan teks untuk {op_name.lower()}: ")
+            if not text:
+                print(yellow("  [!] Teks tidak boleh kosong."))
+                continue
+
+            key = safe_input("  Masukkan kata kunci (huruf alfabet A-Z): ")
+            if not key:
+                print(yellow("  [!] Kunci tidak boleh kosong."))
+                continue
+            if not all(c.isalpha() for c in key):
+                print(red("  [!] Kunci hanya boleh berisi huruf alfabet tanpa angka atau simbol."))
+                continue
+
+            if sel == 0:
+                res = playfair_encrypt(text, key)
+                card = render_card(
+                    title="HASIL OPERASI CRYPTOLAB",
+                    method="Playfair Cipher",
+                    operation="Enkripsi",
+                    status="Berhasil (OK)",
+                    input_text=text,
+                    output_text=res.output_text,
+                    extra_fields={"Key": key, "Matrix": "5x5 (I=J)"},
+                )
+                log_history("Playfair Encrypt", text, res.output_text, {"key": key})
+            else:
+                res = playfair_decrypt(text, key)
+                card = render_card(
+                    title="HASIL OPERASI CRYPTOLAB",
+                    method="Playfair Cipher",
+                    operation="Dekripsi",
+                    status="Berhasil (OK)",
+                    input_text=text,
+                    output_text=res.output_text,
+                    extra_fields={"Key": key, "Note": "Mungkin mengandung padding X"},
+                )
+                log_history("Playfair Decrypt", text, res.output_text, {"key": key})
+
+            print("\n" + card)
+            if not post_result_menu(card, "hasil_playfair.txt"):
+                break
+
+        except BackToMenu:
+            break
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def handle_hill() -> None:
+    """Interactive handler for Hill Cipher."""
+    while True:
+        sel = navigation_menu(
+            options=[
+                "Enkripsi (Plaintext -> Ciphertext)",
+                "Dekripsi (Ciphertext -> Plaintext)",
+            ],
+            title="CRYPTOLAB - HILL CIPHER (Matrix 2x2 / 3x3)",
+            back_label="Kembali ke Menu Utama",
+        )
+        if sel is None:
+            break
+
+        try:
+            size_sel = navigation_menu(
+                options=["2x2 Matrix", "3x3 Matrix"],
+                title="HILL CIPHER - Pilih Ukuran Matrix",
+                back_label="Kembali",
+            )
+            if size_sel is None:
+                continue
+            size = 2 if size_sel == 0 else 3
+
+            op_name = "Enkripsi" if sel == 0 else "Dekripsi"
+            text = safe_input(f"  Masukkan teks untuk {op_name.lower()}: ")
+            if not text:
+                print(yellow("  [!] Teks tidak boleh kosong."))
+                continue
+
+            key = safe_input(f"  Masukkan key matrix {size}x{size} (angka 0-25, spasi pemisah): ")
+            if not key:
+                print(yellow("  [!] Key matrix tidak boleh kosong."))
+                continue
+
+            try:
+                if sel == 0:
+                    res = hill_encrypt(text, key, size)
+                    card = render_card(
+                        title=f"HASIL OPERASI CRYPTOLAB - HILL {size}x{size}",
+                        method="Hill Cipher",
+                        operation="Enkripsi",
+                        status="Berhasil (OK)",
+                        input_text=text,
+                        output_text=res.output_text,
+                        extra_fields={"Key Matrix": key, "Size": f"{size}x{size}", "Det": res.determinant, "DetInv": res.determinant_inv},
+                    )
+                    log_history(f"Hill {size}x{size} Encrypt", text, res.output_text, {"key": key, "size": size})
+                else:
+                    res = hill_decrypt(text, key, size)
+                    card = render_card(
+                        title=f"HASIL OPERASI CRYPTOLAB - HILL {size}x{size}",
+                        method="Hill Cipher",
+                        operation="Dekripsi",
+                        status="Berhasil (OK)",
+                        input_text=text,
+                        output_text=res.output_text,
+                        extra_fields={"Key Matrix": key, "Size": f"{size}x{size}", "Note": "Mungkin mengandung padding X"},
+                    )
+                    log_history(f"Hill {size}x{size} Decrypt", text, res.output_text, {"key": key, "size": size})
+
+                print("\n" + card)
+                if not post_result_menu(card, f"hasil_hill_{size}x{size}.txt"):
+                    break
+
+            except CryptoLabError as err:
+                print(red(f"\n  [!] Kesalahan Hill: {err}"))
+            except Exception as err:
+                print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+        except BackToMenu:
+            break
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def handle_affine() -> None:
+    """Interactive handler for Affine Cipher."""
+    while True:
+        sel = navigation_menu(
+            options=[
+                "Enkripsi (Plaintext -> Ciphertext)",
+                "Dekripsi (Ciphertext -> Plaintext)",
+                "Brute Force (Cari kunci a,b)",
+            ],
+            title="CRYPTOLAB - AFFINE CIPHER E(x) = (ax + b) mod 26",
+            back_label="Kembali ke Menu Utama",
+        )
+        if sel is None:
+            break
+
+        try:
+            if sel == 2:
+                # Brute force
+                text = safe_input("  Masukkan ciphertext: ")
+                if not text:
+                    print(yellow("  [!] Ciphertext tidak boleh kosong."))
+                    continue
+                
+                candidates = affine_brute_force(text)
+                if not candidates:
+                    print(yellow("  [!] Tidak ada kandidat valid."))
+                    continue
+                
+                best = candidates[0]
+                card = render_card(
+                    title="HASIL AFFINE BRUTE FORCE",
+                    method=f"Affine (Best: a={best.a}, b={best.b})",
+                    operation="Brute Force",
+                    status="Kandidat ditemukan",
+                    input_text=text,
+                    output_text=best.output_text,
+                    extra_fields={"Total Candidates": len(candidates), "Top a": best.a, "Top b": best.b},
+                )
+                print("\n" + card)
+                log_history("Affine Brute Force", text, best.output_text, {"candidates": len(candidates)})
+                if not post_result_menu(card, "hasil_affine_brute.txt"):
+                    break
+                continue
+
+            op_name = "Enkripsi" if sel == 0 else "Dekripsi"
+            text = safe_input(f"  Masukkan teks untuk {op_name.lower()}: ")
+            if not text:
+                print(yellow("  [!] Teks tidak boleh kosong."))
+                continue
+
+            a_str = safe_input("  Masukkan a (coprime dengan 26: 1,3,5,7,9,11,15,17,19,21,23,25): ")
+            try:
+                a = int(a_str)
+            except ValueError:
+                print(red("  [!] a harus angka integer."))
+                continue
+
+            b_str = safe_input("  Masukkan b (0-25): ")
+            try:
+                b = int(b_str)
+            except ValueError:
+                print(red("  [!] b harus angka integer."))
+                continue
+
+            try:
+                if sel == 0:
+                    res = affine_encrypt(text, a, b)
+                    card = render_card(
+                        title="HASIL OPERASI CRYPTOLAB - AFFINE",
+                        method="Affine Cipher",
+                        operation="Enkripsi",
+                        status="Berhasil (OK)",
+                        input_text=text,
+                        output_text=res.output_text,
+                        extra_fields={"a": str(a), "b": str(b), "a_inv": str(res.a_inv), "Valid a": f"{len(VALID_A_VALUES)} values"},
+                    )
+                    log_history("Affine Encrypt", text, res.output_text, {"a": a, "b": b})
+                else:
+                    res = affine_decrypt(text, a, b)
+                    card = render_card(
+                        title="HASIL OPERASI CRYPTOLAB - AFFINE",
+                        method="Affine Cipher",
+                        operation="Dekripsi",
+                        status="Berhasil (OK)",
+                        input_text=text,
+                        output_text=res.output_text,
+                        extra_fields={"a": str(a), "b": str(b), "a_inv": str(res.a_inv)},
+                    )
+                    log_history("Affine Decrypt", text, res.output_text, {"a": a, "b": b})
+
+                print("\n" + card)
+                if not post_result_menu(card, "hasil_affine.txt"):
+                    break
+
+            except CryptoLabError as err:
+                print(red(f"\n  [!] Kesalahan: {err}"))
+            except Exception as err:
+                print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+        except BackToMenu:
+            break
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def handle_railfence() -> None:
+    """Interactive handler for Rail Fence Cipher."""
+    while True:
+        sel = navigation_menu(
+            options=[
+                "Enkripsi (Plaintext -> Ciphertext)",
+                "Dekripsi (Ciphertext -> Plaintext)",
+                "Brute Force (Coba semua rail)",
+            ],
+            title="CRYPTOLAB - RAIL FENCE / TRANSPOSITION CIPHER",
+            back_label="Kembali ke Menu Utama",
+        )
+        if sel is None:
+            break
+
+        try:
+            if sel == 2:
+                # Brute force
+                text = safe_input("  Masukkan ciphertext: ")
+                if not text:
+                    print(yellow("  [!] Ciphertext tidak boleh kosong."))
+                    continue
+                
+                max_rails_str = safe_input("  Maksimal rail [10]: ")
+                try:
+                    max_rails = int(max_rails_str) if max_rails_str else 10
+                except ValueError:
+                    max_rails = 10
+                
+                candidates = railfence_brute_force(text, max_rails)
+                if not candidates:
+                    print(yellow("  [!] Tidak ada kandidat valid."))
+                    continue
+                
+                best = candidates[0]
+                card = render_card(
+                    title="HASIL RAIL FENCE BRUTE FORCE",
+                    method=f"Rail Fence (Best: {best.rails} rails)",
+                    operation="Brute Force",
+                    status="Kandidat ditemukan",
+                    input_text=text,
+                    output_text=best.output_text,
+                    extra_fields={"Total Candidates": len(candidates), "Top Rails": best.rails},
+                )
+                print("\n" + card)
+                log_history("Rail Fence Brute Force", text, best.output_text, {"candidates": len(candidates)})
+                if not post_result_menu(card, "hasil_railfence_brute.txt"):
+                    break
+                continue
+
+            rails_str = safe_input("  Jumlah rail (minimal 2): ")
+            try:
+                rails = int(rails_str)
+                if rails < 2:
+                    print(red("  [!] Minimal 2 rail."))
+                    continue
+            except ValueError:
+                print(red("  [!] Rail harus angka integer."))
+                continue
+
+            op_name = "Enkripsi" if sel == 0 else "Dekripsi"
+            text = safe_input(f"  Masukkan teks untuk {op_name.lower()}: ")
+            if not text:
+                print(yellow("  [!] Teks tidak boleh kosong."))
+                continue
+
+            try:
+                if sel == 0:
+                    res = railfence_encrypt(text, rails)
+                    pattern_str = "\n".join(f"  Rail {i}: {' '.join(row)}" for i, row in enumerate(res.rail_pattern))
+                    card = render_card(
+                        title=f"HASIL OPERASI CRYPTOLAB - RAIL FENCE {rails} RAILS",
+                        method="Rail Fence Cipher",
+                        operation="Enkripsi",
+                        status="Berhasil (OK)",
+                        input_text=text,
+                        output_text=res.output_text,
+                        extra_fields={"Rails": str(rails)},
+                    )
+                    print("\n" + card)
+                    print(f"\n  Rail Pattern:\n{pattern_str}\n")
+                    log_history(f"Rail Fence {rails} Encrypt", text, res.output_text, {"rails": rails})
+                else:
+                    res = railfence_decrypt(text, rails)
+                    pattern_str = "\n".join(f"  Rail {i}: {' '.join(row)}" for i, row in enumerate(res.rail_pattern))
+                    card = render_card(
+                        title=f"HASIL OPERASI CRYPTOLAB - RAIL FENCE {rails} RAILS",
+                        method="Rail Fence Cipher",
+                        operation="Dekripsi",
+                        status="Berhasil (OK)",
+                        input_text=text,
+                        output_text=res.output_text,
+                        extra_fields={"Rails": str(rails)},
+                    )
+                    print("\n" + card)
+                    print(f"\n  Rail Pattern:\n{pattern_str}\n")
+                    log_history(f"Rail Fence {rails} Decrypt", text, res.output_text, {"rails": rails})
+
+                if not post_result_menu(card, f"hasil_railfence_{rails}.txt"):
+                    break
+
+            except CryptoLabError as err:
+                print(red(f"\n  [!] Kesalahan: {err}"))
+            except Exception as err:
+                print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
 
         except BackToMenu:
             break
@@ -2800,6 +3200,10 @@ def _run_interactive_menu() -> None:
                 "Auto Analyze",
                 "Caesar Cipher",
                 "Vigenere Cipher",
+                "Playfair Cipher",
+                "Hill Cipher",
+                "Affine Cipher",
+                "Rail Fence Cipher",
                 "DES (Data Encryption Standard - 64 bit)",
                 "AES (Advanced Encryption Standard - 128 bit)",
                 "RC2 (ARC2 - Legacy 64 bit)",
@@ -2831,26 +3235,34 @@ def _run_interactive_menu() -> None:
             elif sel == 2:
                 handle_vigenere()
             elif sel == 3:
-                handle_des()
+                handle_playfair()
             elif sel == 4:
-                handle_aes()
+                handle_hill()
             elif sel == 5:
-                handle_rc2()
+                handle_affine()
             elif sel == 6:
-                handle_hashing()
+                handle_railfence()
             elif sel == 7:
-                handle_rsa()
+                handle_des()
             elif sel == 8:
-                handle_dh()
+                handle_aes()
             elif sel == 9:
-                handle_base64()
+                handle_rc2()
             elif sel == 10:
-                handle_hex()
+                handle_hashing()
             elif sel == 11:
-                handle_binary()
+                handle_rsa()
             elif sel == 12:
-                handle_history()
+                handle_dh()
             elif sel == 13:
+                handle_base64()
+            elif sel == 14:
+                handle_hex()
+            elif sel == 15:
+                handle_binary()
+            elif sel == 16:
+                handle_history()
+            elif sel == 17:
                 print("\n  Terima kasih telah menggunakan CryptoLab CLI. Sampai jumpa!\n")
                 break
         except BackToMenu:
