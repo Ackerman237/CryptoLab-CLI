@@ -10,7 +10,7 @@
 CryptoLab CLI adalah toolkit kriptografi klasik, symmetric block cipher (RC2, DES, dan AES), encoding, dan analisis ciphertext otomatis yang dirancang khusus untuk pembelajaran praktikum keamanan informasi dan kompetisi Capture The Flag (CTF).
 
 ### Keunggulan Utama
-- **Interaktif Penuh & Ramah Pemula**: Pengguna cukup menjalankan perintah `python -m cryptolab`. Seluruh alur kerja menggunakan nomor menu, pertanyaan terarah, dan validasi input tanpa perlu menghafal parameter command yang panjang.
+- **Interaktif Penuh & Ramah Pemula**: Pengguna cukup menjalankan perintah `python -m cryptolab`. Seluruh alur kerja memakai logo ASCII ringkas, navigasi arrow yang konsisten, pertanyaan terarah, dan validasi input tanpa perlu menghafal parameter command yang panjang.
 - **Auto Analyze Cerdas**: Otomatis menganalisis data, mendeteksi format encoding (Base64, Hex, Binary), mengurai *nested encoding* hingga 5 tahap, menjalankan Caesar brute-force, serta menawarkan pengujian cipher ber-kunci jika parameter key/IV tersedia.
 - **Implementasi DES Lengkap (CBC & ECB)**: Mendukung ciphertext heksadesimal, validasi panjang key/IV (tepat 8 byte), pilihan padding PKCS#7 atau tanpa padding (None), serta fallback heksadesimal jika hasil dekripsi di luar karakter UTF-8.
 - **Implementasi RC2 Lengkap (CBC & ECB)**: Mendukung key 5-16 byte, IV 8 byte, padding PKCS#7 atau None, dan `effective-keylen` 40-1024 bit (default 128 bit untuk kompatibilitas vector legacy).
@@ -20,30 +20,25 @@ CryptoLab CLI adalah toolkit kriptografi klasik, symmetric block cipher (RC2, DE
 
 ---
 
-## 2. Struktur Menu Utama
+## 2. Struktur Menu Utama & Arah UI
 
-Saat Anda menjalankan program, menu utama berikut akan ditampilkan:
+Saat Anda menjalankan program, menu utama menampilkan logo `CRYPTOLAB` dan navigasi arrow:
 
 ```text
-====================================================================
-  CRYPTOLAB CLI v0.1.0 - TOOLKIT KRIPTOGRAFI & ENCODING
-====================================================================
-  [1] Auto Analyze
-  [2] Caesar Cipher
-  [3] Vigenere Cipher
-  [4] DES
-  [5] Base64
-  [6] Hex
-  [7] Binary
-  [8] Riwayat
-  [9] Keluar
-====================================================================
-  Pilih menu [1-9]: 
+  CRYPTOLAB
+  ----------------------------------------
+  >> Auto Analyze
+     Caesar Cipher
+     DES / AES / RC2
+     Base64 / Hex / Binary
+     Riwayat
+
+  Arrow atas/bawah untuk memilih, Enter untuk membuka, Q untuk keluar.
 ```
 
-- Masukkan nomor menu yang diinginkan (1 s.d. 9).
-- Anda juga dapat mengetik `0` atau `q` untuk keluar dari program.
-- Ketik `b` atau `kembali` pada saat diminta memasukkan data untuk membatalkan proses dan kembali ke menu utama.
+- Gunakan arrow atas/bawah untuk berpindah dan Enter untuk memilih.
+- Tekan `b` atau `q` untuk kembali/keluar dari menu.
+- Divider pendek digunakan agar output hasil tetap mudah dipindai.
 
 ---
 

@@ -6,9 +6,13 @@ with clear prompts, input validation, back navigation, and consistent formatting
 
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+import readchar
+from readchar import key as readchar_key
 
 from cryptolab import __version__
 from cryptolab.exceptions import (
@@ -24,12 +28,147 @@ from cryptolab.encoding.hex_codec import hex_encode, hex_decode
 from cryptolab.encoding.binary_codec import binary_encode, binary_decode
 from cryptolab.symmetric.des import des_encrypt, des_decrypt, des_auto_analyze, DesResult
 from cryptolab.symmetric.aes import aes_encrypt, aes_decrypt, aes_auto_analyze, AesResult
+from cryptolab.symmetric.rc2 import rc2_encrypt, rc2_decrypt, rc2_auto_analyze, Rc2Result
+from cryptolab.hashing import (
+    hash_compute,
+    hash_file,
+    hmac_compute,
+    hmac_verify,
+    pbkdf2_hash,
+    pbkdf2_verify,
+    bcrypt_hash,
+    bcrypt_verify,
+    hash_verify_integrity,
+    generate_random_bytes,
+    HashResult,
+    HMACResult,
+    PasswordHashResult,
+    VerifyPasswordResult,
+    BCRYPT_AVAILABLE,
+)
+from cryptolab.asymmetric import (
+    rsa_generate_keypair,
+    rsa_encrypt,
+    rsa_decrypt,
+    rsa_sign,
+    rsa_verify,
+    dh_key_exchange,
+    dh_derive_key,
+    RSAKeyPair,
+    RSAResult,
+    DHKeyExchangeResult,
+)
 from cryptolab.analysis.auto_engine import run_auto_analysis, AutoAnalysisReport, AutoCandidate
 from cryptolab.analysis.brute_force import caesar_brute_force, find_best_candidate, CaesarCandidate
 from cryptolab.utils.history import log_history, read_history, clear_history, get_history_file
 
-DIVIDER = "=" * 68
-THIN_DIVIDER = "-" * 68
+DIVIDER = "-" * 56
+THIN_DIVIDER = "." * 56
+LOGO_LARGE = """\
+ ██████ ██████  ██    ██ ██████  ████████  ██████  ██       █████  ██████
+██      ██   ██  ██  ██  ██   ██    ██    ██    ██ ██      ██   ██ ██   ██
+██      ██████    ████   ██████     ██    ██    ██ ██      ███████ ██████
+██      ██   ██    ██    ██         ██    ██    ██ ██      ██   ██ ██   ██
+ ██████ ██   ██    ██    ██         ██     ██████  ███████ ██   ██ ██████"""
+
+_PIXEL_FONT = {
+    "C": [".####", "#....", "#....", "#....", ".####"],
+    "R": ["####.", "#...#", "####.", "#..#.", "#...#"],
+    "Y": ["#...#", "#...#", ".#.#.", "..#..", "..#.."],
+    "P": ["####.", "#...#", "####.", "#....", "#...."],
+    "T": ["#####", "..#..", "..#..", "..#..", "..#.."],
+    "O": [".###.", "#...#", "#...#", "#...#", ".###."],
+    "L": ["#....", "#....", "#....", "#....", "#####"],
+    "A": [".###.", "#...#", "#####", "#...#", "#...#"],
+    "B": ["####.", "#...#", "####.", "#...#", "####."],
+}
+
+
+def _build_pixel_logo(word: str) -> str:
+    rows = ["" for _ in range(5)]
+    for index, character in enumerate(word):
+        for row in range(5):
+            rows[row] += _PIXEL_FONT[character][row] + ("." if index < len(word) - 1 else "")
+    rows.append("." * len(rows[0]))
+    output = []
+    for row in range(0, 6, 2):
+        line = ""
+        for top, bottom in zip(rows[row], rows[row + 1]):
+            line += "█" if top == "#" and bottom == "#" else "▀" if top == "#" else "▄" if bottom == "#" else " "
+        output.append(line.rstrip())
+    return "\n".join(output)
+
+
+LOGO_MEDIUM = _build_pixel_logo("CRYPTOLAB")
+LOGO_TINY = "[ CRYPTOLAB ]"
+LOGO = LOGO_MEDIUM
+
+HELP_CATEGORIES = {
+    "Navigasi CLI": [
+        "↑ / ↓: pindah pilihan; Enter: pilih menu.",
+        "Home / End: lompat ke pilihan pertama/terakhir.",
+        "?: buka bantuan; Q: keluar; B atau Esc: kembali.",
+        "Input data seperti key, IV, plaintext, dan ciphertext tetap diketik sebagai teks.",
+    ],
+    "Classical Cipher": [
+        "Caesar: substitusi alfabet dengan nilai shift; tersedia encrypt, decrypt, brute force.",
+        "Vigenere: substitusi polialfabetik berbasis keyword alfabet.",
+        "Rail Fence: transposisi teks berbasis jumlah rail untuk latihan cipher klasik.",
+        "Playfair: substitusi pasangan huruf menggunakan matriks keyword 5x5.",
+        "Hill: cipher matriks yang memerlukan key matrix invertible.",
+    ],
+    "Symmetric Cipher": [
+        "DES: block cipher legacy 64-bit; CBC/ECB dan PKCS#7/None.",
+        "AES: block cipher modern; CBC/ECB, key 128/192/256-bit, PKCS#7/None.",
+        "RC2/ARC2: block cipher legacy 64-bit; CBC/ECB, key 5-16 byte.",
+        "CBC membutuhkan IV; ECB tidak menggunakan IV. Jangan gunakan cipher legacy untuk sistem baru.",
+    ],
+    "Hashing & Password": [
+        "MD5/SHA-1: tersedia untuk kompatibilitas/latihan, bukan password atau keamanan modern.",
+        "SHA-256/SHA-512: hash satu arah untuk integritas data.",
+        "HMAC: autentikasi pesan dengan secret key dan hash.",
+        "PBKDF2: derivasi key/password dengan salt, iterations, algorithm, dan dklen.",
+        "Bcrypt: password hashing adaptif dengan cost/rounds; verifikasi memakai hash tersimpan.",
+    ],
+    "RSA & Diffie-Hellman": [
+        "RSA: generate keypair, encrypt/decrypt, sign/verify.",
+        "RSA encryption: OAEP direkomendasikan; PKCS#1 v1.5 hanya untuk kompatibilitas legacy.",
+        "RSA signature: PSS direkomendasikan; PKCS#1 v1.5 untuk kompatibilitas.",
+        "Diffie-Hellman: simulasi pertukaran secret dan derivasi key bersama.",
+    ],
+    "Encoding": [
+        "Base64: representasi binary ke teks, bukan enkripsi dan tidak memakai key.",
+        "Hex: representasi byte heksadesimal dengan delimiter opsional.",
+        "Binary: representasi byte 8-bit dengan delimiter opsional.",
+    ],
+    "Analysis & History": [
+        "Auto Analyze: deteksi encoding, pipeline decoding, Caesar brute force, dan cipher berkunci.",
+        "Format detection: indikator heuristik untuk Hex, Base64, dan Binary.",
+        "History: menyimpan ringkasan operasi lokal tanpa key/IV secara default.",
+        "Skor readability adalah heuristik; selalu verifikasi hasil dengan konteks challenge.",
+    ],
+}
+
+
+def terminal_width(default: int = 80) -> int:
+    """Return the current terminal width for responsive rendering."""
+    return shutil.get_terminal_size((default, 24)).columns
+
+
+def _block_width(text: str) -> int:
+    return max((len(line) for line in text.splitlines()), default=0)
+
+
+def pick_logo(width: int) -> str:
+    for logo in (LOGO_LARGE, LOGO_MEDIUM):
+        if _block_width(logo) <= width:
+            return logo
+    return LOGO_TINY
+
+
+def center_block(text: str, width: int, offset: int = 0) -> str:
+    padding = max((width - _block_width(text)) // 2 + offset, 0)
+    return "\n".join(" " * padding + line for line in text.splitlines())
 
 
 class BackToMenu(Exception):
@@ -106,35 +245,40 @@ def render_card(
     reasons: Optional[List[str]] = None,
     extra_fields: Optional[Dict[str, str]] = None,
 ) -> str:
-    """Render consistent result card matching the required lab format."""
+    """Render a compact result panel for the interactive terminal."""
+    status_lower = status.lower()
+    if any(token in status_lower for token in ("gagal", "error", "kesalahan")):
+        styled_status = red(status)
+    elif any(token in status_lower for token in ("berhasil", "ok", "valid")):
+        styled_status = green(status)
+    else:
+        styled_status = yellow(status)
+
     lines = [
-        DIVIDER,
+        "",
         f"  {title.upper()}",
-        DIVIDER,
-        f"  Metode       : {method}",
-        f"  Operasi      : {operation}",
-        f"  Status       : {status}",
+        f"  {method}  |  {operation}",
+        f"  Status: {styled_status}",
     ]
 
     if extra_fields:
         for k, v in extra_fields.items():
-            lines.append(f"  {k:<12} : {v}")
+            lines.append(f"  {k}: {v}")
 
-    # Format input and output cleanly
     lines.extend([
-        THIN_DIVIDER,
-        "  INPUT        :",
+        "",
+        "  Input",
         f"  {input_text}",
-        THIN_DIVIDER,
-        "  OUTPUT       :",
+        "",
+        "  Output",
         f"  {output_text}",
     ])
 
     if reasons:
-        lines.append(THIN_DIVIDER)
-        lines.append(f"  Alasan       : {'; '.join(reasons)}")
+        lines.append("")
+        lines.append(f"  Catatan: {'; '.join(reasons)}")
 
-    lines.append(DIVIDER)
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -157,19 +301,169 @@ def post_result_menu(
 ) -> bool:
     """Display post-result options. Returns True if user wants to repeat, False to go back."""
     while True:
-        print("\n  Opsi Setelah Proses:")
-        print("  [1] Ulangi proses / Coba data lain")
-        print("  [2] Simpan hasil ke file")
-        print("  [0] Kembali ke menu utama")
-        choice = safe_input("  Pilih opsi [0-2] [0]: ", allow_back=True)
-        if choice in ("0", "", "b", "kembali"):
+        choice = navigation_menu(
+            options=[
+                "Ulangi proses / Coba data lain",
+                "Simpan hasil ke file",
+                "Kembali ke menu utama",
+            ],
+            title="OPSI SETELAH PROSES",
+            back_label="Kembali ke menu utama",
+            clear_display=False,
+        )
+        if choice is None or choice == 2:
             return False
-        elif choice == "1":
+        elif choice == 0:
             return True
-        elif choice == "2":
+        elif choice == 1:
             save_result_prompt(result_text, default_filename)
+
+
+def navigation_menu(
+    options: List[str],
+    title: str = "CRYPTOLAB MENU",
+    allow_back: bool = True,
+    back_label: str = "Kembali",
+    clear_display: bool = True,
+    banner: Optional[str] = None,
+    banner_responsive: bool = False,
+    help_enabled: bool = True,
+) -> Optional[int]:
+    """Navigate menu with arrow keys (Up/Down), press Enter to select.
+    Uses ANSI cursor movement for flicker-free navigation.
+    
+    Args:
+        options: List of menu option strings
+        title: Menu title to display
+        allow_back: Whether to allow 'b'/'0'/'back' to go back
+        back_label: Label for the back option
+    
+    Returns:
+        Selected index (0-based), or None if user goes back
+    """
+    selected = 0
+    options_count = len(options)
+    menu_rendered = False
+    
+    def clear_screen():
+        """Clear the terminal screen."""
+        sys.stdout.write("\033[2J\033[H")
+        sys.stdout.flush()
+    
+    def render_menu_initial():
+        """Initial full render of the menu."""
+        nonlocal menu_rendered
+        width = terminal_width()
+        if clear_display:
+            clear_screen()
+        elif menu_rendered:
+            # Restore the menu origin and remove only the previous menu.
+            sys.stdout.write("\033[u\033[J")
         else:
-            print(yellow("  [!] Pilihan tidak valid. Silakan pilih 0, 1, atau 2."))
+            # Keep the result card visible above this menu.
+            sys.stdout.write("\033[s")
+        if banner:
+            banner_text = pick_logo(width) if banner_responsive else banner
+            print(center_block(banner_text.rstrip("\n"), width, offset=-4))
+        print(center_block(title[:max(20, width - 2)], width, offset=-4))
+        print()
+        sys.stdout.write("\033[s")
+        for i, opt in enumerate(options):
+            option_text = opt if len(opt) <= width - 8 else opt[:max(1, width - 11)] + "..."
+            prefix = green("  >> ") if i == selected else "     "
+            print(f"{prefix}{option_text}")
+        hints = "  ↑↓ navigasi  |  Enter pilih  |  ? bantuan  |  Q keluar"
+        if allow_back:
+            hints += f"  |  B/Esc {back_label.lower()}"
+        print(hints[:max(20, width - 2)])
+        print()
+        sys.stdout.flush()
+        menu_rendered = True
+    
+    def update_selection(old_idx: int, new_idx: int):
+        """Update only the selection indicators without full redraw."""
+        width = terminal_width()
+        sys.stdout.write("\033[u")
+        for i, opt in enumerate(options):
+            option_text = opt if len(opt) <= width - 8 else opt[:max(1, width - 11)] + "..."
+            prefix = green("  >> ") if i == selected else "     "
+            sys.stdout.write(f"\033[2K\r{prefix}{option_text}\n")
+        sys.stdout.flush()
+
+    def show_help():
+        """Show categorized algorithm help without adding help to the options."""
+        category_names = list(HELP_CATEGORIES)
+        while True:
+            category = navigation_menu(
+                category_names,
+                title="BANTUAN CRYPTOLAB - PILIH KATEGORI",
+                allow_back=True,
+                back_label="Kembali ke menu",
+                clear_display=clear_display,
+                help_enabled=False,
+            )
+            if category is None:
+                render_menu_initial()
+                return
+
+            if clear_display:
+                clear_screen()
+            print("\n  " + category_names[category].upper())
+            print()
+            for item in HELP_CATEGORIES[category_names[category]]:
+                print("  - " + item)
+            print("\n  Tekan tombol apa saja untuk kembali ke kategori.")
+            key = readchar.readkey()
+            if key.lower() in ("q", "b") or key == getattr(readchar_key, "ESC", "\x1b"):
+                render_menu_initial()
+                return
+    
+    # Initial render
+    render_menu_initial()
+    
+    while True:
+        try:
+            k = readchar.readkey()
+        except (KeyboardInterrupt, EOFError):
+            return None
+        
+        home_key = getattr(readchar_key, "HOME", "\x1b[H")
+        end_key = getattr(readchar_key, "END", "\x1b[F")
+        if k == readchar_key.UP:
+            if selected > 0:
+                old = selected
+                selected -= 1
+                update_selection(old, selected)
+        elif k == readchar_key.DOWN:
+            if selected < options_count - 1:
+                old = selected
+                selected += 1
+                update_selection(old, selected)
+        elif k == home_key:
+            if selected != 0:
+                old = selected
+                selected = 0
+                update_selection(old, selected)
+        elif k == end_key:
+            if selected != options_count - 1:
+                old = selected
+                selected = options_count - 1
+                update_selection(old, selected)
+        elif k in (readchar_key.ENTER, '\r', '\n'):
+            if clear_display:
+                clear_screen()
+            return selected
+        elif k.lower() in ('q',):
+            if clear_display:
+                clear_screen()
+            return None
+        elif help_enabled and k == '?':
+            show_help()
+        elif allow_back and (k.lower() in ('b', '0') or k == getattr(readchar_key, "ESC", "\x1b")):
+            if clear_display:
+                clear_screen()
+            return None
+        # Ignore other keys
 
 
 # ======================================================================
@@ -322,24 +616,21 @@ def handle_caesar() -> None:
         print("\n" + DIVIDER)
         print("  CRYPTOLAB - CAESAR CIPHER")
         print(DIVIDER)
-        print("  [1] Enkripsi (Plaintext -> Ciphertext)")
-        print("  [2] Dekripsi (Ciphertext -> Plaintext dengan Shift Diketahui)")
-        print("  [3] Brute Force (Uji Seluruh 26 Pergeseran / Cari Shift Otomatis)")
-        print("  [0] Kembali ke Menu Utama")
-        print(DIVIDER)
-
-        choice = safe_input("  Pilih operasi [0-3]: ", allow_back=False)
-        if choice in ("0", "b", "kembali"):
+        choice = navigation_menu(
+            options=[
+                "Enkripsi (Plaintext -> Ciphertext)",
+                "Dekripsi (Ciphertext -> Plaintext dengan Shift Diketahui)",
+                "Brute Force (Uji Seluruh 26 Pergeseran / Cari Shift Otomatis)",
+            ],
+            title="CRYPTOLAB - CAESAR CIPHER",
+            back_label="Kembali ke Menu Utama",
+        )
+        if choice is None:
             break
 
-
-        if choice not in ("1", "2", "3"):
-            print(yellow("  [!] Pilihan tidak valid. Silakan pilih nomor 0-3."))
-            continue
-
         try:
-            if choice in ("1", "2"):
-                op_name = "Enkripsi" if choice == "1" else "Dekripsi"
+            if choice in (0, 1):
+                op_name = "Enkripsi" if choice == 0 else "Dekripsi"
                 text = safe_input(f"  Masukkan teks untuk {op_name.lower()}: ")
                 if not text:
                     print(yellow("  [!] Teks tidak boleh kosong."))
@@ -352,7 +643,7 @@ def handle_caesar() -> None:
                     print(red("  [!] Shift harus berupa angka bulat (contoh: 3 atau -5)."))
                     continue
 
-                if choice == "1":
+                if choice == 0:
                     out = caesar_encrypt(text, shift)
                     card = render_card(
                         title="HASIL OPERASI CRYPTOLAB",
@@ -381,7 +672,7 @@ def handle_caesar() -> None:
                 if not post_result_menu(card, "hasil_caesar.txt"):
                     break
 
-            elif choice == "3":
+            elif choice == 2:
                 text = safe_input("  Masukkan ciphertext Caesar: ")
                 if not text:
                     print(yellow("  [!] Ciphertext tidak boleh kosong."))
@@ -442,22 +733,19 @@ def handle_vigenere() -> None:
         print("\n" + DIVIDER)
         print("  CRYPTOLAB - VIGENERE CIPHER")
         print(DIVIDER)
-        print("  [1] Enkripsi (Plaintext -> Ciphertext)")
-        print("  [2] Dekripsi (Ciphertext -> Plaintext)")
-        print("  [0] Kembali ke Menu Utama")
-        print(DIVIDER)
-
-        choice = safe_input("  Pilih operasi [0-2]: ", allow_back=False)
-        if choice in ("0", "b", "kembali"):
+        choice = navigation_menu(
+            options=[
+                "Enkripsi (Plaintext -> Ciphertext)",
+                "Dekripsi (Ciphertext -> Plaintext)",
+            ],
+            title="CRYPTOLAB - VIGENERE CIPHER",
+            back_label="Kembali ke Menu Utama",
+        )
+        if choice is None:
             break
 
-
-        if choice not in ("1", "2"):
-            print(yellow("  [!] Pilihan tidak valid. Silakan pilih 1, 2, atau 0."))
-            continue
-
         try:
-            op_name = "Enkripsi" if choice == "1" else "Dekripsi"
+            op_name = "Enkripsi" if choice == 0 else "Dekripsi"
             text = safe_input(f"  Masukkan teks untuk {op_name.lower()}: ")
             if not text:
                 print(yellow("  [!] Teks tidak boleh kosong."))
@@ -471,7 +759,7 @@ def handle_vigenere() -> None:
                 print(red("  [!] Kunci hanya boleh berisi huruf alfabet tanpa angka atau simbol."))
                 continue
 
-            if choice == "1":
+            if choice == 0:
                 out = vigenere_encrypt(text, key)
                 card = render_card(
                     title="HASIL OPERASI CRYPTOLAB",
@@ -513,230 +801,165 @@ def handle_vigenere() -> None:
 def handle_des() -> None:
     """Interactive handler for DES (CBC/ECB)."""
     while True:
-        print("\n" + DIVIDER)
-        print("  CRYPTOLAB - DES (DATA ENCRYPTION STANDARD)")
-        print(DIVIDER)
-        print("  Perhatian Keamanan:")
-        print("  DES menggunakan panjang kunci 56-bit yang sudah usang dan rentan brute-force.")
-        print("  Fitur ini disediakan strictly untuk pembelajaran lab dan tantangan CTF.")
-        print(THIN_DIVIDER)
-        print("  Pilih Operasi:")
-        print("  [1] Dekripsi (Ciphertext Hex -> Plaintext)")
-        print("  [2] Enkripsi (Plaintext -> Ciphertext Hex)")
-        print("  [3] Auto Analisis Mode & Padding (Uji ECB & CBC)")
-        print("  [0] Kembali ke Menu Utama")
-        print(DIVIDER)
-
-        choice = safe_input("  Pilih operasi [0-3]: ", allow_back=False)
-        if choice in ("0", "b", "kembali"):
+        sel = navigation_menu(
+            options=[
+                "Dekripsi (Ciphertext Hex -> Plaintext)",
+                "Enkripsi (Plaintext -> Ciphertext Hex)",
+                "Auto Analisis Mode & Padding (Uji ECB & CBC)",
+            ],
+            title="CRYPTOLAB - DES (DATA ENCRYPTION STANDARD)",
+            back_label="Kembali ke Menu Utama",
+        )
+        
+        if sel is None:
             break
-
-
-        if choice not in ("1", "2", "3"):
-            print(yellow("  [!] Pilihan tidak valid. Silakan pilih nomor 0-3."))
-            continue
-
+        
         try:
-            if choice == "1":
-                # Dekripsi DES
-                ct_hex = safe_input("  Masukkan ciphertext (format heksadesimal): ")
-                if not ct_hex:
-                    print(yellow("  [!] Ciphertext heksadesimal tidak boleh kosong."))
+            if sel == 0:
+                _handle_des_decrypt()
+            elif sel == 1:
+                _handle_des_encrypt()
+            elif sel == 2:
+                _handle_des_auto_analyze()
+        
+        except BackToMenu:
+            continue
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan DES: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def _handle_des_decrypt() -> None:
+    """Handle DES decryption with mode selection."""
+    while True:
+        print("\n" + DIVIDER)
+        print("  DES DEKRIPSI - Pilih Mode")
+        print(DIVIDER)
+        
+        mode_sel = navigation_menu(
+            options=[
+                "Auto (analisis heuristik mode dan padding, key & IV opsional)",
+                "CBC (Cipher Block Chaining - membutuhkan IV 8 byte)",
+                "ECB (Electronic Codebook - tanpa IV)",
+            ],
+            title="DES DEKRIPSI - Pilih Mode",
+            back_label="Kembali ke Menu DES",
+        )
+        
+        if mode_sel is None:
+            break
+        
+        try:
+            ct_hex = safe_input("  Masukkan ciphertext (format heksadesimal): ")
+            if not ct_hex:
+                print(yellow("  [!] Ciphertext heksadesimal tidak boleh kosong."))
+                continue
+
+            if mode_sel == 0:
+                # Auto mode - key and IV are optional
+                print("\n  Mode Auto: Key dan IV opsional (tekan Enter untuk melewati)")
+                key = safe_input("  Masukkan key (tepat 8 karakter/byte, Enter untuk skip): ")
+                key_val = key if len(key.encode("utf-8")) == 8 else None
+                
+                iv = None
+                if key_val:
+                    iv_cand = safe_input("  Masukkan IV (8 karakter untuk CBC, Enter untuk skip/ECB): ")
+                    iv = iv_cand if len(iv_cand.encode("utf-8")) == 8 else None
+                
+                if key_val is None:
+                    print(yellow("  [!] Key dilewati. Auto analisis memerlukan key. Gunakan mode CBC/ECB manual."))
                     continue
 
-                print("\n  Pilih Mode DES:")
-                print("  [1] Auto (analisis mode dan parameter yang memungkinkan)")
-                print("  [2] CBC (Cipher Block Chaining - membutuhkan IV)")
-                print("  [3] ECB (Electronic Codebook - tanpa IV)")
-                print("  [0] Batal")
-                mode_choice = safe_input("  Pilih mode [1-3] [1]: ") or "1"
+                candidates: List[DesResult] = des_auto_analyze(ct_hex, key=key_val, iv=iv)
 
-                if mode_choice in ("0", "b"):
+                if not candidates:
+                    print(yellow("  [!] Tidak ada konfigurasi DES yang berhasil secara teknis."))
                     continue
 
-                if mode_choice == "1":
-                    # Mode Auto
-                    key = safe_input("  Masukkan key (tepat 8 karakter/byte): ")
-                    if len(key.encode("utf-8")) != 8:
-                        print(red(f"  [!] Panjang key DES harus tepat 8 byte. (Ditemukan: {len(key.encode('utf-8'))} byte)."))
-                        continue
+                top = candidates[0]
+                card = render_card(
+                    title="HASIL ANALISIS DES (KANDIDAT TERBAIK)",
+                    method=f"DES ({top.mode}, Padding {top.padding})",
+                    operation="Dekripsi",
+                    status="Kandidat ditemukan" if top.readable_success else "Dekripsi teknis berhasil (Plaintext belum terverifikasi)",
+                    input_text=ct_hex,
+                    output_text=top.output_text if top.is_utf8 else f"[Bytes Hex] {top.output_text}",
+                    reasons=top.reasons,
+                    extra_fields={
+                        "Mode": top.mode,
+                        "Padding": top.padding,
+                        "Status UTF-8": "Valid" if top.is_utf8 else "Non-UTF8 (Tampil Hex)",
+                    },
+                )
+                print("\n" + card)
 
-                    iv_cand = safe_input(
-                        "  Masukkan IV (8 karakter untuk mode CBC, atau tekan Enter jika tanpa IV): "
-                    )
-                    iv_val = iv_cand if len(iv_cand.encode("utf-8")) == 8 else None
+                if len(candidates) > 1:
+                    print("\n  KANDIDAT MODE/PADDING LAIN:")
+                    print("  ------------------------------------------------------------------")
+                    for idx, c in enumerate(candidates[1:], start=1):
+                        prev = c.output_text[:35] + ("..." if len(c.output_text) > 35 else "")
+                        print(f"  [{idx}] Mode {c.mode} | Padding {c.padding} | Skor: {c.score:.1f}/100 -> {prev}")
 
-                    candidates: List[DesResult] = des_auto_analyze(ct_hex, key=key, iv=iv_val)
+                print(THIN_DIVIDER)
+                print("  Catatan: Ciphertext heksadesimal tidak membuktikan mode CBC atau ECB.")
+                print("  Hasil ditampilkan sebagai kandidat heuristik terverifikasi.")
+                print(DIVIDER)
 
-                    if not candidates:
-                        print(yellow("  [!] Tidak ada konfigurasi DES yang berhasil secara teknis."))
-                        continue
+                log_history("DES Auto Decrypt", ct_hex, top.output_text, {"mode": top.mode, "padding": top.padding})
 
-                    top = candidates[0]
-                    card = render_card(
-                        title="HASIL ANALISIS DES (KANDIDAT TERBAIK)",
-                        method=f"DES ({top.mode}, Padding {top.padding})",
-                        operation="Dekripsi",
-                        status="Kandidat ditemukan" if top.readable_success else "Dekripsi teknis berhasil (Plaintext belum terverifikasi)",
-                        input_text=ct_hex,
-                        output_text=top.output_text if top.is_utf8 else f"[Bytes Hex] {top.output_text}",
-                        reasons=top.reasons,
-                        extra_fields={
-                            "Mode": top.mode,
-                            "Padding": top.padding,
-                            "Status UTF-8": "Valid" if top.is_utf8 else "Non-UTF8 (Tampil Hex)",
-                        },
-                    )
-                    print("\n" + card)
+                if not post_result_menu(card, "hasil_des.txt"):
+                    break
 
-                    if len(candidates) > 1:
-                        print("\n  KANDIDAT MODE/PADDING LAIN:")
-                        print("  ------------------------------------------------------------------")
-                        for idx, c in enumerate(candidates[1:], start=1):
-                            prev = c.output_text[:35] + ("..." if len(c.output_text) > 35 else "")
-                            print(f"  [{idx}] Mode {c.mode} | Padding {c.padding} | Skor: {c.score:.1f}/100 -> {prev}")
-
-                    print(THIN_DIVIDER)
-                    print("  Catatan: Ciphertext heksadesimal tidak membuktikan mode CBC atau ECB.")
-                    print("  Hasil ditampilkan sebagai kandidat heuristik, bukan kepastian mutlak.")
-                    print(DIVIDER)
-
-                    # Do NOT log secret key/IV
-                    log_history("DES Auto Decrypt", ct_hex, top.output_text, {"mode": top.mode, "padding": top.padding})
-
-                    if not post_result_menu(card, "hasil_des.txt"):
-                        break
-
-                elif mode_choice in ("2", "3"):
-                    mode = "CBC" if mode_choice == "2" else "ECB"
-                    key = safe_input("  Masukkan key: ")
-                    if len(key.encode("utf-8")) != 8:
-                        print(red(f"  [!] Panjang key DES harus tepat 8 byte. (Ditemukan: {len(key.encode('utf-8'))} byte)."))
-                        continue
-
-                    iv: Optional[str] = None
-                    if mode == "CBC":
-                        iv = safe_input("  Masukkan IV: ")
-                        if len(iv.encode("utf-8")) != 8:
-                            print(red(f"  [!] Panjang IV DES CBC harus tepat 8 byte. (Ditemukan: {len(iv.encode('utf-8'))} byte)."))
-                            continue
-
-                    print("  Pilih padding:")
-                    print("  [1] PKCS#7 (standar default)")
-                    print("  [2] Tanpa Padding (None)")
-                    pad_choice = safe_input("  Pilih padding [1-2] [1]: ") or "1"
-                    padding = "PKCS7" if pad_choice == "1" else "None"
-
-                    res = des_decrypt(ct_hex, key=key, mode=mode, iv=iv, padding=padding)
-
-                    status_msg = "Berhasil (Teks UTF-8 Terbaca)" if res.readable_success else "Berhasil Secara Teknis (Keterbacaan Rendah)"
-                    if not res.is_utf8:
-                        status_msg = "Berhasil Secara Teknis (Bukan teks UTF-8 valid - Hasil berupa Hex)"
-
-                    card = render_card(
-                        title="HASIL OPERASI CRYPTOLAB - DES DECRYPT",
-                        method=f"DES ({mode})",
-                        operation="Dekripsi",
-                        status=status_msg,
-                        input_text=ct_hex,
-                        output_text=res.output_text if res.is_utf8 else f"[Bytes Hex] {res.output_text}",
-                        reasons=res.reasons,
-                        extra_fields={
-                            "Mode": mode,
-                            "Padding": padding,
-                            "Status UTF-8": "Valid" if res.is_utf8 else "Non-UTF8 (Tampil Hex)",
-                        },
-                    )
-                    print("\n" + card)
-
-                    # Do NOT log secret key/IV
-                    log_history("DES Decrypt", ct_hex, res.output_text, {"mode": mode, "padding": padding})
-
-                    if not post_result_menu(card, "hasil_des.txt"):
-                        break
-
-            elif choice == "2":
-                # Enkripsi DES
-                plaintext = safe_input("  Masukkan plaintext untuk dienkripsi: ")
-                if not plaintext:
-                    print(yellow("  [!] Plaintext tidak boleh kosong."))
-                    continue
-
-                print("\n  Pilih Mode DES:")
-                print("  [1] CBC (Cipher Block Chaining - membutuhkan IV) [Default]")
-                print("  [2] ECB (Electronic Codebook - tanpa IV)")
-                mode_c = safe_input("  Pilih mode [1-2] [1]: ") or "1"
-                mode = "CBC" if mode_c == "1" else "ECB"
-
+            else:
+                mode = "CBC" if mode_sel == 1 else "ECB"
                 key = safe_input("  Masukkan key (tepat 8 karakter/byte): ")
                 if len(key.encode("utf-8")) != 8:
                     print(red(f"  [!] Panjang key DES harus tepat 8 byte. (Ditemukan: {len(key.encode('utf-8'))} byte)."))
                     continue
 
-                iv = None
+                iv: Optional[str] = None
                 if mode == "CBC":
                     iv = safe_input("  Masukkan IV (tepat 8 karakter/byte): ")
                     if len(iv.encode("utf-8")) != 8:
                         print(red(f"  [!] Panjang IV DES CBC harus tepat 8 byte. (Ditemukan: {len(iv.encode('utf-8'))} byte)."))
                         continue
 
-                print("  Pilih padding:")
-                print("  [1] PKCS#7 (standar default)")
-                print("  [2] Tanpa Padding (None - plaintext harus kelipatan 8 byte)")
-                pad_c = safe_input("  Pilih padding [1-2] [1]: ") or "1"
-                padding = "PKCS7" if pad_c == "1" else "None"
+                pad_sel = navigation_menu(
+                    options=["PKCS#7 (standar default)", "Tanpa Padding (None)"],
+                    title="DES DEKRIPSI - Pilih Padding",
+                    back_label="Batal",
+                )
+                if pad_sel is None:
+                    continue
+                padding = "PKCS7" if pad_sel == 0 else "None"
 
-                res_enc = des_encrypt(plaintext, key=key, mode=mode, iv=iv, padding=padding)
+                res = des_decrypt(ct_hex, key=key, mode=mode, iv=iv, padding=padding)
+
+                status_msg = "Berhasil (Teks UTF-8 Terbaca)" if res.readable_success else "Berhasil Secara Teknis (Keterbacaan Rendah)"
+                if not res.is_utf8:
+                    status_msg = "Berhasil Secara Teknis (Bukan teks UTF-8 valid - Hasil berupa Hex)"
 
                 card = render_card(
-                    title="HASIL OPERASI CRYPTOLAB - DES ENCRYPT",
+                    title="HASIL OPERASI CRYPTOLAB - DES DECRYPT",
                     method=f"DES ({mode})",
-                    operation="Enkripsi",
-                    status="Berhasil (OK)",
-                    input_text=plaintext,
-                    output_text=res_enc.output_text,
-                    reasons=["Enkripsi selesai tanpa kesalahan"],
-                    extra_fields={"Mode": mode, "Padding": padding},
+                    operation="Dekripsi",
+                    status=status_msg,
+                    input_text=ct_hex,
+                    output_text=res.output_text if res.is_utf8 else f"[Bytes Hex] {res.output_text}",
+                    reasons=res.reasons,
+                    extra_fields={
+                        "Mode": mode,
+                        "Padding": padding,
+                        "Status UTF-8": "Valid" if res.is_utf8 else "Non-UTF8 (Tampil Hex)",
+                    },
                 )
                 print("\n" + card)
 
-                # Do NOT log secret key/IV
-                log_history("DES Encrypt", plaintext, res_enc.output_text, {"mode": mode, "padding": padding})
+                log_history("DES Decrypt", ct_hex, res.output_text, {"mode": mode, "padding": padding})
 
-                if not post_result_menu(card, "hasil_des_encrypt.txt"):
+                if not post_result_menu(card, "hasil_des.txt"):
                     break
-
-            elif choice == "3":
-                # Langsung ke Auto Analisis DES
-                ct_hex = safe_input("  Masukkan ciphertext heksadesimal: ")
-                key = safe_input("  Masukkan key jika tersedia, atau tekan Enter untuk melewati: ")
-                iv_input = safe_input("  Masukkan IV jika tersedia (khusus CBC), atau tekan Enter untuk melewati: ")
-
-                if not key:
-                    print(yellow("  [!] DES tidak dapat didekripsi tanpa key. Silakan peroleh key dari challenge lab."))
-                    continue
-
-                iv_val = iv_input if len(iv_input.encode("utf-8")) == 8 else None
-                candidates = des_auto_analyze(ct_hex, key=key, iv=iv_val)
-
-                if candidates:
-                    top = candidates[0]
-                    card = render_card(
-                        title="HASIL ANALISIS DES",
-                        method=f"DES ({top.mode}, Padding {top.padding})",
-                        operation="Auto Analisis",
-                        status="Kandidat ditemukan",
-                        input_text=ct_hex,
-                        output_text=top.output_text if top.is_utf8 else f"[Bytes Hex] {top.output_text}",
-                        reasons=top.reasons,
-                        extra_fields={"Mode": top.mode, "Padding": top.padding},
-                    )
-                    print("\n" + card)
-                    log_history("DES Auto Analyze", ct_hex, top.output_text, {"mode": top.mode, "padding": top.padding})
-                    if not post_result_menu(card, "hasil_des_auto.txt"):
-                        break
-                else:
-                    print(yellow("  [!] Tidak ada kombinasi DES yang valid dengan parameter tersebut."))
 
         except BackToMenu:
             break
@@ -746,175 +969,1392 @@ def handle_des() -> None:
             print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
 
 
-def handle_aes() -> None:
-    """Interactive handler for AES (Advanced Encryption Standard - 128 bit CBC/ECB)."""
+def _handle_des_encrypt() -> None:
+    """Handle DES encryption."""
     while True:
-        print("\n" + DIVIDER)
-        print("  CRYPTOLAB - AES (ADVANCED ENCRYPTION STANDARD - 128 BIT)")
-        print(DIVIDER)
-        print("  Catatan Kriptografi:")
-        print("  AES adalah standar enkripsi simetris modern (FIPS 197) dengan ukuran")
-        print("  blok 128-bit (16 byte). AES-128 membutuhkan key sepanjang tepat 16 byte.")
-        print(THIN_DIVIDER)
-        print("  Pilih Operasi:")
-        print("  [1] Dekripsi (Ciphertext Hex -> Plaintext)")
-        print("  [2] Enkripsi (Plaintext -> Ciphertext Hex)")
-        print("  [3] Auto Analisis Mode & Padding (Uji CBC & ECB)")
-        print("  [0] Kembali ke Menu Utama")
-        print(DIVIDER)
+        plaintext = safe_input("  Masukkan plaintext untuk dienkripsi: ")
+        if not plaintext:
+            print(yellow("  [!] Plaintext tidak boleh kosong."))
+            continue
 
-        choice = safe_input("  Pilih operasi [0-3]: ", allow_back=False)
-        if choice in ("0", "b", "kembali"):
+        mode_sel = navigation_menu(
+            options=[
+                "CBC (Cipher Block Chaining - membutuhkan IV 8 byte) [Default]",
+                "ECB (Electronic Codebook - tanpa IV)",
+            ],
+            title="DES ENKRIPSI - Pilih Mode",
+            back_label="Batal",
+        )
+        if mode_sel is None:
+            break
+        
+        mode = "CBC" if mode_sel == 0 else "ECB"
+
+        key = safe_input("  Masukkan key (tepat 8 karakter/byte): ")
+        if len(key.encode("utf-8")) != 8:
+            print(red(f"  [!] Panjang key DES harus tepat 8 byte. (Ditemukan: {len(key.encode('utf-8'))} byte)."))
+            continue
+
+        iv = None
+        if mode == "CBC":
+            iv = safe_input("  Masukkan IV (tepat 8 karakter/byte): ")
+            if len(iv.encode("utf-8")) != 8:
+                print(red(f"  [!] Panjang IV DES CBC harus tepat 8 byte. (Ditemukan: {len(iv.encode('utf-8'))} byte)."))
+                continue
+
+        pad_sel = navigation_menu(
+            options=["PKCS#7 (standar default)", "Tanpa Padding (None - plaintext harus kelipatan 8 byte)"],
+            title="DES ENKRIPSI - Pilih Padding",
+            back_label="Batal",
+        )
+        if pad_sel is None:
+            continue
+        padding = "PKCS7" if pad_sel == 0 else "None"
+
+        res_enc = des_encrypt(plaintext, key=key, mode=mode, iv=iv, padding=padding)
+
+        card = render_card(
+            title="HASIL OPERASI CRYPTOLAB - DES ENCRYPT",
+            method=f"DES ({mode})",
+            operation="Enkripsi",
+            status="Berhasil (OK)",
+            input_text=plaintext,
+            output_text=res_enc.output_text,
+            reasons=["Enkripsi selesai tanpa kesalahan"],
+            extra_fields={"Mode": mode, "Padding": padding},
+        )
+        print("\n" + card)
+
+        log_history("DES Encrypt", plaintext, res_enc.output_text, {"mode": mode, "padding": padding})
+
+        if not post_result_menu(card, "hasil_des_encrypt.txt"):
             break
 
-        if choice not in ("1", "2", "3"):
-            print(yellow("  [!] Pilihan tidak valid. Silakan pilih nomor 0-3."))
+
+def _handle_des_auto_analyze() -> None:
+    """Handle DES auto analyze."""
+    while True:
+        print("\n" + DIVIDER)
+        print("  DES AUTO ANALISIS")
+        print(DIVIDER)
+        print("  Fitur ini menguji kombinasi mode (CBC/ECB) dan padding (PKCS7/None)")
+        print("  Key diperlukan, IV opsional (tekan Enter untuk melewati).")
+        print(THIN_DIVIDER)
+
+        try:
+            ct_hex = safe_input("  Masukkan ciphertext heksadesimal: ")
+            if not ct_hex:
+                print(yellow("  [!] Ciphertext tidak boleh kosong."))
+                continue
+
+            key = safe_input("  Masukkan key (tepat 8 karakter/byte, Enter untuk skip): ")
+            key_val = key if len(key.encode("utf-8")) == 8 else None
+            
+            iv_val: Optional[str] = None
+            if key_val:
+                iv_cand = safe_input("  Masukkan IV (8 karakter untuk CBC, Enter untuk skip): ")
+                iv_val = iv_cand if len(iv_cand.encode("utf-8")) == 8 else None
+            
+            if key_val is None:
+                print(yellow("  [!] Key dilewati. DES tidak dapat didekripsi tanpa key."))
+                continue
+
+            candidates = des_auto_analyze(ct_hex, key=key_val, iv=iv_val)
+
+            if candidates:
+                top = candidates[0]
+                card = render_card(
+                    title="HASIL ANALISIS DES",
+                    method=f"DES ({top.mode}, Padding {top.padding})",
+                    operation="Auto Analisis",
+                    status="Kandidat ditemukan",
+                    input_text=ct_hex,
+                    output_text=top.output_text if top.is_utf8 else f"[Bytes Hex] {top.output_text}",
+                    reasons=top.reasons,
+                    extra_fields={"Mode": top.mode, "Padding": top.padding},
+                )
+                print("\n" + card)
+                log_history("DES Auto Analyze", ct_hex, top.output_text, {"mode": top.mode, "padding": top.padding})
+                if not post_result_menu(card, "hasil_des_auto.txt"):
+                    break
+            else:
+                print(yellow("  [!] Tidak ada kombinasi DES yang valid dengan parameter tersebut."))
+
+        except BackToMenu:
+            break
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan DES: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def handle_rc2() -> None:
+    """Interactive handler for legacy RC2/ARC2 (CBC/ECB)."""
+    while True:
+        print("\n" + DIVIDER)
+        print("  CRYPTOLAB - RC2 (ARC2) LEGACY 64-BIT")
+        print(DIVIDER)
+        print("  RC2 hanya untuk praktikum, CTF, dan kompatibilitas data lama.")
+        print("  Default effective key length: 128 bit.")
+        print(THIN_DIVIDER)
+        choice = navigation_menu(
+            options=[
+                "Dekripsi (Ciphertext Hex -> Plaintext)",
+                "Enkripsi (Plaintext -> Ciphertext Hex)",
+                "Auto Analisis Mode & Padding",
+            ],
+            title="CRYPTOLAB - RC2 (ARC2) LEGACY 64-BIT",
+            back_label="Kembali ke Menu Utama",
+        )
+        if choice is None:
+            break
+
+        try:
+            if choice == 0:
+                text = safe_input("  Masukkan ciphertext heksadesimal: ")
+            elif choice == 1:
+                text = safe_input("  Masukkan plaintext: ")
+            else:
+                text = safe_input("  Masukkan ciphertext heksadesimal: ")
+            if not text:
+                print(yellow("  [!] Input tidak boleh kosong."))
+                continue
+
+            key = safe_input("  Masukkan key RC2 (5-16 byte): ")
+            if not 5 <= len(key.encode("utf-8")) <= 16:
+                print(red(f"  [!] Panjang key RC2 harus 5-16 byte. Ditemukan: {len(key.encode('utf-8'))} byte."))
+                continue
+
+            iv: Optional[str] = None
+            if choice == 2:
+                iv_input = safe_input("  Masukkan IV CBC (8 byte), atau Enter untuk ECB: ")
+                if iv_input:
+                    if len(iv_input.encode("utf-8")) != 8:
+                        print(red("  [!] Panjang IV RC2 CBC harus tepat 8 byte."))
+                        continue
+                    iv = iv_input
+                candidates = rc2_auto_analyze(text, key=key, iv=iv)
+                if not candidates:
+                    print(yellow("  [!] Tidak ada konfigurasi RC2 yang berhasil."))
+                    continue
+                result = candidates[0]
+                card = render_card(
+                    title="HASIL ANALISIS RC2",
+                    method=f"RC2 ({result.mode}, Padding {result.padding})",
+                    operation="Auto Analisis",
+                    status="Kandidat ditemukan",
+                    input_text=text,
+                    output_text=result.output_text if result.is_utf8 else f"[Bytes Hex] {result.output_text}",
+                    reasons=result.reasons,
+                    extra_fields={"Mode": result.mode, "Padding": result.padding, "Effective Key Length": "128 bit"},
+                )
+                print("\n" + card)
+                log_history("RC2 Auto Analyze", text, result.output_text, {"mode": result.mode, "padding": result.padding})
+                if not post_result_menu(card, "hasil_rc2_auto.txt"):
+                    break
+                continue
+
+            mode_sel = navigation_menu(
+                options=[
+                    "CBC (Cipher Block Chaining - membutuhkan IV 8 byte)",
+                    "ECB (Electronic Codebook - tanpa IV)",
+                ],
+                title="RC2 - Pilih Mode",
+                back_label="Batal",
+            )
+            if mode_sel is None:
+                continue
+            mode = "CBC" if mode_sel == 0 else "ECB"
+            if mode == "CBC":
+                iv = safe_input("  Masukkan IV (tepat 8 karakter/byte): ")
+                if len(iv.encode("utf-8")) != 8:
+                    print(red("  [!] Panjang IV RC2 CBC harus tepat 8 byte."))
+                    continue
+
+            pad_sel = navigation_menu(
+                options=["PKCS#7 (standar default)", "Tanpa Padding (None)"],
+                title="RC2 - Pilih Padding",
+                back_label="Batal",
+            )
+            if pad_sel is None:
+                continue
+            padding = "PKCS7" if pad_sel == 0 else "None"
+            if choice == 0:
+                result = rc2_decrypt(text, key=key, mode=mode, iv=iv, padding=padding)
+                title, operation, output = "HASIL OPERASI CRYPTOLAB - RC2 DECRYPT", "Dekripsi", result.output_text
+                history_operation = "RC2 Decrypt"
+            else:
+                result = rc2_encrypt(text, key=key, mode=mode, iv=iv, padding=padding)
+                title, operation, output = "HASIL OPERASI CRYPTOLAB - RC2 ENCRYPT", "Enkripsi", result.output_text
+                history_operation = "RC2 Encrypt"
+            card = render_card(
+                title=title,
+                method=f"RC2 ({mode})",
+                operation=operation,
+                status="Berhasil (OK)",
+                input_text=text,
+                output_text=output,
+                reasons=result.reasons,
+                extra_fields={"Mode": mode, "Padding": padding, "Effective Key Length": "128 bit"},
+            )
+            print("\n" + card)
+            log_history(history_operation, text, output, {"mode": mode, "padding": padding})
+            if not post_result_menu(card, "hasil_rc2.txt"):
+                break
+        except BackToMenu:
+            break
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan RC2: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def handle_hashing() -> None:
+    """Interactive handler for Hashing (MD5, SHA1, SHA256, SHA512, HMAC, PBKDF2, Bcrypt, Random)."""
+    while True:
+        options = [
+            "Hash Compute (MD5, SHA1, SHA256, SHA512)",
+            "Hash File",
+            "Verifikasi Integritas (Hash)",
+            "HMAC Compute & Verify",
+            "PBKDF2 Hash & Verify Password",
+        ]
+        if BCRYPT_AVAILABLE:
+            options.append("Bcrypt Hash & Verify Password")
+        options.append("Generate Random Bytes")
+
+        sel = navigation_menu(
+            options=options,
+            title="CRYPTOLAB - HASHING & PASSWORD SECURITY",
+            back_label="Kembali ke Menu Utama",
+        )
+        if sel is None:
+            break
+
+        try:
+            if sel == 0:
+                _handle_hash_compute()
+            elif sel == 1:
+                _handle_hash_file()
+            elif sel == 2:
+                _handle_hash_verify()
+            elif sel == 3:
+                _handle_hmac()
+            elif sel == 4:
+                _handle_pbkdf2()
+            elif sel == 5 and BCRYPT_AVAILABLE:
+                _handle_bcrypt()
+            elif sel == 5 and not BCRYPT_AVAILABLE:
+                _handle_random_bytes()
+            elif sel == 6:
+                _handle_random_bytes()
+        except BackToMenu:
+            continue
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan Hashing: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def _handle_hash_compute() -> None:
+    """Handle hash computation."""
+    while True:
+        algo_sel = navigation_menu(
+            options=["MD5 (128-bit)", "SHA1 (160-bit)", "SHA256 (256-bit)", "SHA512 (512-bit)"],
+            title="HASH COMPUTE - Pilih Algoritma",
+            back_label="Kembali",
+        )
+        if algo_sel is None:
+            break
+        algorithms = ["MD5", "SHA1", "SHA256", "SHA512"]
+        algo = algorithms[algo_sel]
+
+        enc_sel = navigation_menu(
+            options=["Hexadecimal", "Base64"],
+            title=f"{algo} - Pilih Format Output",
+            back_label="Kembali",
+        )
+        if enc_sel is None:
+            continue
+        encoding = "hex" if enc_sel == 0 else "base64"
+
+        data = safe_input(f"  Masukkan data untuk {algo} hash: ")
+        if not data:
+            print(yellow("  [!] Data tidak boleh kosong."))
+            continue
+
+        res = hash_compute(data, algorithm=algo, encoding=encoding)
+        card = render_card(
+            title=f"HASIL HASH {algo}",
+            method=f"{algo} Hash",
+            operation="COMPUTE",
+            status="Berhasil (OK)",
+            input_text=data,
+            output_text=res.output_hash,
+            reasons=[f"Output dalam format {encoding.upper()}"],
+            extra_fields={"Algorithm": algo, "Encoding": encoding.upper()},
+        )
+        print("\n" + card)
+        log_history(f"Hash {algo} Compute", data, res.output_hash, {"algo": algo, "encoding": encoding})
+        if not post_result_menu(card, f"hasil_hash_{algo.lower()}.txt"):
+            break
+
+
+def _handle_hash_file() -> None:
+    """Handle file hashing."""
+    while True:
+        filepath = safe_input("  Masukkan path file: ")
+        if not filepath:
+            print(yellow("  [!] Path file tidak boleh kosong."))
+            continue
+
+        algo_sel = navigation_menu(
+            options=["MD5 (128-bit)", "SHA1 (160-bit)", "SHA256 (256-bit)", "SHA512 (512-bit)"],
+            title="HASH FILE - Pilih Algoritma",
+            back_label="Kembali",
+        )
+        if algo_sel is None:
+            break
+        algorithms = ["MD5", "SHA1", "SHA256", "SHA512"]
+        algo = algorithms[algo_sel]
+
+        try:
+            res = hash_file(filepath, algorithm=algo)
+            card = render_card(
+                title=f"HASIL HASH FILE {algo}",
+                method=f"{algo} Hash",
+                operation="FILE",
+                status="Berhasil (OK)",
+                input_text=filepath,
+                output_text=res.output_hash,
+                reasons=["File dibaca dalam chunk 8KB"],
+                extra_fields={"Algorithm": algo, "File": filepath},
+            )
+            print("\n" + card)
+            log_history(f"Hash {algo} File", filepath, res.output_hash, {"algo": algo, "filepath": filepath})
+            if not post_result_menu(card, f"hasil_hash_file_{algo.lower()}.txt"):
+                break
+        except InvalidInputError as e:
+            print(red(f"  [!] {e}"))
+        except Exception as e:
+            print(red(f"  [!] Gagal membaca file: {e}"))
+
+
+def _handle_hash_verify() -> None:
+    """Handle hash integrity verification."""
+    while True:
+        algo_sel = navigation_menu(
+            options=["MD5 (128-bit)", "SHA1 (160-bit)", "SHA256 (256-bit)", "SHA512 (512-bit)"],
+            title="VERIFIKASI INTEGRITAS - Pilih Algoritma",
+            back_label="Kembali",
+        )
+        if algo_sel is None:
+            break
+        algorithms = ["MD5", "SHA1", "SHA256", "SHA512"]
+        algo = algorithms[algo_sel]
+
+        enc_sel = navigation_menu(
+            options=["Hexadecimal", "Base64"],
+            title=f"{algo} Verify - Pilih Format Hash",
+            back_label="Kembali",
+        )
+        if enc_sel is None:
+            continue
+        encoding = "hex" if enc_sel == 0 else "base64"
+
+        data = safe_input("  Masukkan data asli: ")
+        if not data:
+            print(yellow("  [!] Data tidak boleh kosong."))
+            continue
+
+        expected = safe_input("  Masukkan hash yang diharapkan: ")
+        if not expected:
+            print(yellow("  [!] Hash yang diharapkan tidak boleh kosong."))
+            continue
+
+        res = hash_verify_integrity(data, expected, algorithm=algo, encoding=encoding)
+        status = "VALID (COCOK)" if res.match else "INVALID (TIDAK COCOK)"
+        card = render_card(
+            title=f"VERIFIKASI INTEGRITAS {algo}",
+            method=f"{algo} Verify",
+            operation="VERIFY",
+            status=status,
+            input_text=data,
+            output_text="COCOK" if res.match else "TIDAK COCOK",
+            reasons=res.reasons,
+            extra_fields={"Algorithm": algo, "Expected": expected, "Status": "VALID" if res.match else "INVALID"},
+        )
+        print("\n" + card)
+        log_history(f"Hash {algo} Verify", data, "COCOK" if res.match else "TIDAK COCOK", {"algo": algo, "match": res.match})
+        if not post_result_menu(card, f"hasil_hash_verify_{algo.lower()}.txt"):
+            break
+
+
+def _handle_hmac() -> None:
+    """Handle HMAC operations."""
+    while True:
+        sel = navigation_menu(
+            options=["HMAC Compute", "HMAC Verify"],
+            title="HMAC - Hash-based Message Authentication Code",
+            back_label="Kembali",
+        )
+        if sel is None:
+            break
+
+        algo_sel = navigation_menu(
+            options=["HMAC-MD5", "HMAC-SHA1", "HMAC-SHA256", "HMAC-SHA512"],
+            title="HMAC - Pilih Algoritma",
+            back_label="Kembali",
+        )
+        if algo_sel is None:
+            continue
+        algorithms = ["MD5", "SHA1", "SHA256", "SHA512"]
+        algo = algorithms[algo_sel]
+
+        enc_sel = navigation_menu(
+            options=["Hexadecimal", "Base64"],
+            title=f"HMAC-{algo} - Pilih Format Output",
+            back_label="Kembali",
+        )
+        if enc_sel is None:
+            continue
+        encoding = "hex" if enc_sel == 0 else "base64"
+
+        if sel == 0:
+            # Compute
+            message = safe_input("  Masukkan pesan: ")
+            if not message:
+                print(yellow("  [!] Pesan tidak boleh kosong."))
+                continue
+            key = safe_input("  Masukkan kunci rahasia: ")
+            if not key:
+                print(yellow("  [!] Kunci tidak boleh kosong."))
+                continue
+
+            res = hmac_compute(message, key, algorithm=algo, encoding=encoding)
+            card = render_card(
+                title=f"HASIL HMAC-{algo}",
+                method=f"HMAC-{algo}",
+                operation="COMPUTE",
+                status="Berhasil (OK)",
+                input_text=message,
+                output_text=res.output_hmac,
+                reasons=[f"Key length: {len(key)} bytes", f"Output: {encoding.upper()}"],
+                extra_fields={"Algorithm": f"HMAC-{algo}", "Encoding": encoding.upper()},
+            )
+            print("\n" + card)
+            log_history(f"HMAC-{algo} Compute", message, res.output_hmac, {"algo": algo, "encoding": encoding})
+            if not post_result_menu(card, f"hasil_hmac_{algo.lower()}.txt"):
+                break
+
+        else:
+            # Verify
+            message = safe_input("  Masukkan pesan: ")
+            if not message:
+                print(yellow("  [!] Pesan tidak boleh kosong."))
+                continue
+            key = safe_input("  Masukkan kunci rahasia: ")
+            if not key:
+                print(yellow("  [!] Kunci tidak boleh kosong."))
+                continue
+            expected = safe_input("  Masukkan HMAC yang diharapkan: ")
+            if not expected:
+                print(yellow("  [!] HMAC yang diharapkan tidak boleh kosong."))
+                continue
+
+            match = hmac_verify(message, key, expected, algorithm=algo, encoding=encoding)
+            status = "VALID (COCOK)" if match else "INVALID (TIDAK COCOK)"
+            card = render_card(
+                title=f"VERIFIKASI HMAC-{algo}",
+                method=f"HMAC-{algo}",
+                operation="VERIFY",
+                status=status,
+                input_text=message,
+                output_text="COCOK" if match else "TIDAK COCOK",
+                reasons=["Konstanta-time comparison"],
+                extra_fields={"Algorithm": f"HMAC-{algo}", "Status": "VALID" if match else "INVALID"},
+            )
+            print("\n" + card)
+            log_history(f"HMAC-{algo} Verify", message, "COCOK" if match else "TIDAK COCOK", {"algo": algo, "match": match})
+            if not post_result_menu(card, f"hasil_hmac_verify_{algo.lower()}.txt"):
+                break
+
+
+def _handle_pbkdf2() -> None:
+    """Handle PBKDF2 operations."""
+    while True:
+        sel = navigation_menu(
+            options=["PBKDF2 Hash Password", "PBKDF2 Verify Password"],
+            title="PBKDF2 - Password-Based Key Derivation Function 2",
+            back_label="Kembali",
+        )
+        if sel is None:
+            break
+
+        algo_sel = navigation_menu(
+            options=["PBKDF2-SHA256", "PBKDF2-SHA512"],
+            title="PBKDF2 - Pilih Algoritma",
+            back_label="Kembali",
+        )
+        if algo_sel is None:
+            continue
+        algorithms = ["SHA256", "SHA512"]
+        algo = algorithms[algo_sel]
+
+        enc_sel = navigation_menu(
+            options=["Hexadecimal", "Base64"],
+            title=f"PBKDF2-{algo} - Pilih Format Output",
+            back_label="Kembali",
+        )
+        if enc_sel is None:
+            continue
+        encoding = "hex" if enc_sel == 0 else "base64"
+
+        if sel == 0:
+            # Hash
+            password = safe_input("  Masukkan password: ")
+            if not password:
+                print(yellow("  [!] Password tidak boleh kosong."))
+                continue
+
+            salt_input = safe_input("  Masukkan salt (hex/base64, kosong untuk random): ")
+            salt = salt_input if salt_input else None
+
+            iter_input = safe_input("  Jumlah iterasi [100000]: ")
+            try:
+                iterations = int(iter_input) if iter_input else 100000
+                if iterations < 1000:
+                    print(red("  [!] Iterations minimal 1000."))
+                    continue
+            except ValueError:
+                print(red("  [!] Iterations harus angka."))
+                continue
+
+            dklen_input = safe_input("  Derived key length (bytes) [32]: ")
+            try:
+                dklen = int(dklen_input) if dklen_input else 32
+                if dklen < 1 or dklen > 128:
+                    print(red("  [!] DKLen harus 1-128 bytes."))
+                    continue
+            except ValueError:
+                print(red("  [!] DKLen harus angka."))
+                continue
+
+            res = pbkdf2_hash(password, salt=salt, iterations=iterations, algorithm=algo, dklen=dklen, encoding=encoding)
+            output_text = f"Salt: {res.salt}\nHash: {res.hash_value}"
+            card = render_card(
+                title=f"HASIL PBKDF2-{algo}",
+                method=f"PBKDF2-{algo}",
+                operation="HASH",
+                status="Berhasil (OK)",
+                input_text="********",
+                output_text=output_text,
+                reasons=[f"Salt: {len(bytes.fromhex(res.salt)) if encoding=='hex' else len(base64.b64decode(res.salt))} bytes", f"DKLen: {dklen} bytes", f"Output: {encoding.upper()}"],
+                extra_fields={"Algorithm": f"PBKDF2-{algo}", "Iterations": f"{iterations:,}", "DKLen": f"{dklen} bytes", "Encoding": encoding.upper()},
+            )
+            print("\n" + card)
+            log_history(f"PBKDF2-{algo} Hash", "********", res.hash_value, {"algo": algo, "iterations": iterations, "salt": res.salt})
+            if not post_result_menu(card, f"hasil_pbkdf2_{algo.lower()}.txt"):
+                break
+
+        else:
+            # Verify
+            password = safe_input("  Masukkan password: ")
+            if not password:
+                print(yellow("  [!] Password tidak boleh kosong."))
+                continue
+
+            salt = safe_input("  Masukkan salt (hex/base64): ")
+            if not salt:
+                print(yellow("  [!] Salt tidak boleh kosong."))
+                continue
+
+            expected = safe_input("  Masukkan hash yang diharapkan: ")
+            if not expected:
+                print(yellow("  [!] Hash yang diharapkan tidak boleh kosong."))
+                continue
+
+            iter_input = safe_input("  Jumlah iterasi [100000]: ")
+            try:
+                iterations = int(iter_input) if iter_input else 100000
+            except ValueError:
+                print(red("  [!] Iterations harus angka."))
+                continue
+
+            dklen_input = safe_input("  Derived key length (bytes) [32]: ")
+            try:
+                dklen = int(dklen_input) if dklen_input else 32
+            except ValueError:
+                print(red("  [!] DKLen harus angka."))
+                continue
+
+            res = pbkdf2_verify(password, salt, expected, iterations=iterations, algorithm=algo, dklen=dklen, encoding=encoding)
+            status = "COCOK" if res.match else "TIDAK COCOK"
+            card = render_card(
+                title=f"VERIFIKASI PBKDF2-{algo}",
+                method=f"PBKDF2-{algo}",
+                operation="VERIFY",
+                status=status,
+                input_text="********",
+                output_text=status,
+                reasons=res.reasons,
+                extra_fields={"Algorithm": f"PBKDF2-{algo}", "Status": status},
+            )
+            print("\n" + card)
+            log_history(f"PBKDF2-{algo} Verify", "********", status, {"algo": algo, "match": res.match})
+            if not post_result_menu(card, f"hasil_pbkdf2_verify_{algo.lower()}.txt"):
+                break
+
+
+def _handle_bcrypt() -> None:
+    """Handle Bcrypt operations."""
+    while True:
+        sel = navigation_menu(
+            options=["Bcrypt Hash Password", "Bcrypt Verify Password"],
+            title="BCRYPT - Adaptive Password Hashing",
+            back_label="Kembali",
+        )
+        if sel is None:
+            break
+
+        if sel == 0:
+            # Hash
+            password = safe_input("  Masukkan password: ")
+            if not password:
+                print(yellow("  [!] Password tidak boleh kosong."))
+                continue
+
+            rounds_input = safe_input("  Cost factor/rounds (4-31) [12]: ")
+            try:
+                rounds = int(rounds_input) if rounds_input else 12
+                if rounds < 4 or rounds > 31:
+                    print(red("  [!] Rounds harus 4-31."))
+                    continue
+            except ValueError:
+                print(red("  [!] Rounds harus angka."))
+                continue
+
+            res = bcrypt_hash(password, rounds=rounds)
+            card = render_card(
+                title="HASIL BCRYPT",
+                method="BCRYPT",
+                operation="HASH",
+                status="Berhasil (OK)",
+                input_text="********",
+                output_text=res.hash_value,
+                reasons=["Adaptive hash dengan salt otomatis", "Cocok untuk penyimpanan password"],
+                extra_fields={"Algorithm": "BCRYPT", "Rounds": str(rounds)},
+            )
+            print("\n" + card)
+            log_history("Bcrypt Hash", "********", res.hash_value, {"rounds": rounds})
+            if not post_result_menu(card, "hasil_bcrypt.txt"):
+                break
+
+        else:
+            # Verify
+            password = safe_input("  Masukkan password: ")
+            if not password:
+                print(yellow("  [!] Password tidak boleh kosong."))
+                continue
+
+            expected = safe_input("  Masukkan hash bcrypt: ")
+            if not expected:
+                print(yellow("  [!] Hash tidak boleh kosong."))
+                continue
+
+            res = bcrypt_verify(password, expected)
+            status = "COCOK" if res.match else "TIDAK COCOK"
+            card = render_card(
+                title="VERIFIKASI BCRYPT",
+                method="BCRYPT",
+                operation="VERIFY",
+                status=status,
+                input_text="********",
+                output_text=status,
+                reasons=res.reasons,
+                extra_fields={"Algorithm": "BCRYPT", "Status": status},
+            )
+            print("\n" + card)
+            log_history("Bcrypt Verify", "********", status, {"match": res.match})
+            if not post_result_menu(card, "hasil_bcrypt_verify.txt"):
+                break
+
+
+def _handle_random_bytes() -> None:
+    """Handle random bytes generation."""
+    while True:
+        length_input = safe_input("  Panjang random bytes (1-1024) [32]: ")
+        try:
+            length = int(length_input) if length_input else 32
+            if length < 1 or length > 1024:
+                print(red("  [!] Panjang harus 1-1024 bytes."))
+                continue
+        except ValueError:
+            print(red("  [!] Panjang harus angka."))
+            continue
+
+        enc_sel = navigation_menu(
+            options=["Hexadecimal", "Base64"],
+            title="RANDOM BYTES - Pilih Format Output",
+            back_label="Kembali",
+        )
+        if enc_sel is None:
+            continue
+        encoding = "hex" if enc_sel == 0 else "base64"
+
+        out = generate_random_bytes(length, encoding=encoding)
+        card = render_card(
+            title="RANDOM BYTES",
+            method="CSPRNG",
+            operation="GENERATE",
+            status="Berhasil (OK)",
+            input_text="",
+            output_text=out,
+            reasons=["Cryptographically secure random (secrets.token_bytes)"],
+            extra_fields={"Length": f"{length} bytes", "Encoding": encoding.upper()},
+        )
+        print("\n" + card)
+        log_history("Random Bytes", "", out, {"length": length, "encoding": encoding})
+        if not post_result_menu(card, "hasil_random.txt"):
+            break
+
+
+def handle_rsa() -> None:
+    """Interactive handler for RSA Asymmetric Cryptography."""
+    while True:
+        sel = navigation_menu(
+            options=[
+                "Generate Key Pair",
+                "Encrypt (Public Key)",
+                "Decrypt (Private Key)",
+                "Sign Message (Private Key)",
+                "Verify Signature (Public Key)",
+            ],
+            title="CRYPTOLAB - RSA ASYMMETRIC CRYPTOGRAPHY",
+            back_label="Kembali ke Menu Utama",
+        )
+        if sel is None:
+            break
+
+        try:
+            if sel == 0:
+                _handle_rsa_keygen()
+            elif sel == 1:
+                _handle_rsa_encrypt()
+            elif sel == 2:
+                _handle_rsa_decrypt()
+            elif sel == 3:
+                _handle_rsa_sign()
+            elif sel == 4:
+                _handle_rsa_verify()
+        except BackToMenu:
+            continue
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan RSA: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def _handle_rsa_keygen() -> None:
+    """Handle RSA key pair generation."""
+    while True:
+        size_sel = navigation_menu(
+            options=["1024 bit (Legacy)", "2048 bit (Recommended)", "3072 bit (High Security)", "4096 bit (Maximum)"],
+            title="RSA KEYGEN - Pilih Ukuran Kunci",
+            back_label="Kembali",
+        )
+        if size_sel is None:
+            break
+        key_sizes = [1024, 2048, 3072, 4096]
+        key_size = key_sizes[size_sel]
+
+        print(f"\n  Menghasilkan RSA {key_size}-bit key pair...")
+        kp = rsa_generate_keypair(key_size)
+
+        print("\n" + DIVIDER)
+        print(f"  RSA {key_size}-BIT KEY PAIR GENERATED")
+        print(DIVIDER)
+        print("\n  PRIVATE KEY (Simpan dengan aman!):")
+        print("  " + "\n  ".join(kp.private_key_pem.strip().split("\n")))
+        print("\n  PUBLIC KEY (Bisa dibagikan):")
+        print("  " + "\n  ".join(kp.public_key_pem.strip().split("\n")))
+        print(DIVIDER)
+
+        save_private = safe_input("  Simpan private key ke file? (y/n) [n]: ").lower()
+        if save_private in ("y", "ya", "yes"):
+            fname = safe_input("  Nama file private key [rsa_private.pem]: ") or "rsa_private.pem"
+            with open(fname, "w") as f:
+                f.write(kp.private_key_pem)
+            print(green(f"  [OK] Private key disimpan ke {fname}"))
+
+        save_public = safe_input("  Simpan public key ke file? (y/n) [n]: ").lower()
+        if save_public in ("y", "ya", "yes"):
+            fname = safe_input("  Nama file public key [rsa_public.pem]: ") or "rsa_public.pem"
+            with open(fname, "w") as f:
+                f.write(kp.public_key_pem)
+            print(green(f"  [OK] Public key disimpan ke {fname}"))
+
+        log_history(f"RSA KeyGen {key_size}", "", "KEYPAIR GENERATED", {"keysize": key_size})
+        if not post_result_menu("", f"hasil_rsa_keygen_{key_size}.txt"):
+            break
+
+
+def _load_key_interactive(prompt: str, is_private: bool) -> str:
+    """Load key from file or inline input."""
+    print(f"\n  {prompt}")
+    print("  [1] Load dari file")
+    print("  [2] Paste inline (akhiri dengan baris kosong)")
+    src_sel = navigation_menu(
+        options=["Load dari file", "Paste inline"],
+        title="LOAD KEY",
+        back_label="Batal",
+    )
+    if src_sel is None:
+        raise BackToMenu()
+
+    if src_sel == 0:
+        filepath = safe_input("  Path file key: ")
+        try:
+            with open(filepath, "r") as f:
+                return f.read().strip()
+        except OSError as e:
+            print(red(f"  [!] Gagal membaca file: {e}"))
+            raise BackToMenu()
+    else:
+        print("  Paste key (akhiri dengan baris kosong):")
+        lines = []
+        while True:
+            line = input("  ")
+            if not line:
+                break
+            lines.append(line)
+        if not lines:
+            print(red("  [!] Key tidak boleh kosong."))
+            raise BackToMenu()
+        return "\n".join(lines)
+
+
+def _handle_rsa_encrypt() -> None:
+    """Handle RSA encryption."""
+    while True:
+        message = safe_input("  Masukkan plaintext untuk dienkripsi: ")
+        if not message:
+            print(yellow("  [!] Plaintext tidak boleh kosong."))
             continue
 
         try:
-            if choice == "1":
+            pubkey = _load_key_interactive("Load PUBLIC KEY", is_private=False)
+        except BackToMenu:
+            continue
+
+        pad_sel = navigation_menu(
+            options=["OAEP (Recommended)", "PKCS1v15 (Legacy)"],
+            title="RSA ENCRYPT - Padding",
+            back_label="Batal",
+        )
+        if pad_sel is None:
+            continue
+        padding = "OAEP" if pad_sel == 0 else "PKCS1v15"
+
+        hash_algo = "SHA256"
+        if padding == "OAEP":
+            hash_sel = navigation_menu(
+                options=["SHA256", "SHA512"],
+                title="OAEP - Hash Algorithm",
+                back_label="Batal",
+            )
+            if hash_sel is None:
+                continue
+            hash_algo = "SHA256" if hash_sel == 0 else "SHA512"
+
+        enc_sel = navigation_menu(
+            options=["Hex", "Base64"],
+            title="Output Encoding",
+            back_label="Batal",
+        )
+        if enc_sel is None:
+            continue
+        encoding = "hex" if enc_sel == 0 else "base64"
+
+        try:
+            res = rsa_encrypt(message, pubkey, padding=padding, hash_algo=hash_algo, encoding=encoding)
+            card = render_card(
+                title=f"HASIL RSA ENKRIPSI",
+                method=f"RSA-{res.algorithm}",
+                operation="ENCRYPT",
+                status="Berhasil (OK)",
+                input_text=message,
+                output_text=res.output_text,
+                reasons=[f"Key size: {res.key_size} bit", f"Padding: {padding}", f"Encoding: {encoding.upper()}"],
+                extra_fields={"Algorithm": res.algorithm, "Key Size": f"{res.key_size} bit"},
+            )
+            print("\n" + card)
+            log_history(f"RSA Encrypt", message, res.output_text, {"algo": res.algorithm})
+            if not post_result_menu(card, "hasil_rsa_encrypt.txt"):
+                break
+        except Exception as e:
+            print(red(f"  [!] Enkripsi gagal: {e}"))
+
+
+def _handle_rsa_decrypt() -> None:
+    """Handle RSA decryption."""
+    while True:
+        ciphertext = safe_input("  Masukkan ciphertext: ")
+        if not ciphertext:
+            print(yellow("  [!] Ciphertext tidak boleh kosong."))
+            continue
+
+        try:
+            privkey = _load_key_interactive("Load PRIVATE KEY", is_private=True)
+        except BackToMenu:
+            continue
+
+        pad_sel = navigation_menu(
+            options=["OAEP (Recommended)", "PKCS1v15 (Legacy)"],
+            title="RSA DECRYPT - Padding",
+            back_label="Batal",
+        )
+        if pad_sel is None:
+            continue
+        padding = "OAEP" if pad_sel == 0 else "PKCS1v15"
+
+        hash_algo = "SHA256"
+        if padding == "OAEP":
+            hash_sel = navigation_menu(
+                options=["SHA256", "SHA512"],
+                title="OAEP - Hash Algorithm",
+                back_label="Batal",
+            )
+            if hash_sel is None:
+                continue
+            hash_algo = "SHA256" if hash_sel == 0 else "SHA512"
+
+        enc_sel = navigation_menu(
+            options=["Hex", "Base64"],
+            title="Input Ciphertext Encoding",
+            back_label="Batal",
+        )
+        if enc_sel is None:
+            continue
+        encoding = "hex" if enc_sel == 0 else "base64"
+
+        try:
+            res = rsa_decrypt(ciphertext, privkey, padding=padding, hash_algo=hash_algo, encoding=encoding)
+            card = render_card(
+                title=f"HASIL RSA DEKRIPSI",
+                method=f"RSA-{res.algorithm}",
+                operation="DECRYPT",
+                status="Berhasil (OK)" if not res.is_hex else "Berhasil (Output Hex)",
+                input_text=f"[{len(ciphertext)} chars ciphertext]",
+                output_text=res.output_text,
+                reasons=["UTF-8 valid" if not res.is_hex else "Output bukan UTF-8, ditampilkan hex"],
+                extra_fields={"Algorithm": res.algorithm, "Key Size": f"{res.key_size} bit"},
+            )
+            print("\n" + card)
+            log_history(f"RSA Decrypt", ciphertext, res.output_text, {"algo": res.algorithm})
+            if not post_result_menu(card, "hasil_rsa_decrypt.txt"):
+                break
+        except Exception as e:
+            print(red(f"  [!] Dekripsi gagal: {e}"))
+
+
+def _handle_rsa_sign() -> None:
+    """Handle RSA signing."""
+    while True:
+        message = safe_input("  Masukkan pesan untuk ditandatangani: ")
+        if not message:
+            print(yellow("  [!] Pesan tidak boleh kosong."))
+            continue
+
+        try:
+            privkey = _load_key_interactive("Load PRIVATE KEY", is_private=True)
+        except BackToMenu:
+            continue
+
+        pad_sel = navigation_menu(
+            options=["PSS (Recommended)", "PKCS1v15 (Legacy)"],
+            title="RSA SIGN - Padding",
+            back_label="Batal",
+        )
+        if pad_sel is None:
+            continue
+        sig_padding = "PSS" if pad_sel == 0 else "PKCS1v15"
+
+        hash_sel = navigation_menu(
+            options=["SHA256", "SHA512"],
+            title="Hash Algorithm",
+            back_label="Batal",
+        )
+        if hash_sel is None:
+            continue
+        hash_algo = "SHA256" if hash_sel == 0 else "SHA512"
+
+        enc_sel = navigation_menu(
+            options=["Hex", "Base64"],
+            title="Output Signature Encoding",
+            back_label="Batal",
+        )
+        if enc_sel is None:
+            continue
+        encoding = "hex" if enc_sel == 0 else "base64"
+
+        try:
+            res = rsa_sign(message, privkey, padding=sig_padding, hash_algo=hash_algo, encoding=encoding)
+            card = render_card(
+                title=f"HASIL RSA SIGN",
+                method=f"RSA-{res.algorithm}",
+                operation="SIGN",
+                status="Berhasil (OK)",
+                input_text=message,
+                output_text=res.output_text,
+                reasons=[f"Key size: {res.key_size} bit", f"Hash: {hash_algo}", f"Padding: {sig_padding}"],
+                extra_fields={"Algorithm": res.algorithm, "Key Size": f"{res.key_size} bit"},
+            )
+            print("\n" + card)
+            log_history(f"RSA Sign", message, res.output_text, {"algo": res.algorithm})
+            if not post_result_menu(card, "hasil_rsa_sign.txt"):
+                break
+        except Exception as e:
+            print(red(f"  [!] Signing gagal: {e}"))
+
+
+def _handle_rsa_verify() -> None:
+    """Handle RSA signature verification."""
+    while True:
+        message = safe_input("  Masukkan pesan asli: ")
+        if not message:
+            print(yellow("  [!] Pesan tidak boleh kosong."))
+            continue
+
+        signature = safe_input("  Masukkan signature: ")
+        if not signature:
+            print(yellow("  [!] Signature tidak boleh kosong."))
+            continue
+
+        try:
+            pubkey = _load_key_interactive("Load PUBLIC KEY", is_private=False)
+        except BackToMenu:
+            continue
+
+        pad_sel = navigation_menu(
+            options=["PSS (Recommended)", "PKCS1v15 (Legacy)"],
+            title="RSA VERIFY - Padding",
+            back_label="Batal",
+        )
+        if pad_sel is None:
+            continue
+        sig_padding = "PSS" if pad_sel == 0 else "PKCS1v15"
+
+        hash_sel = navigation_menu(
+            options=["SHA256", "SHA512"],
+            title="Hash Algorithm",
+            back_label="Batal",
+        )
+        if hash_sel is None:
+            continue
+        hash_algo = "SHA256" if hash_sel == 0 else "SHA512"
+
+        enc_sel = navigation_menu(
+            options=["Hex", "Base64"],
+            title="Signature Encoding",
+            back_label="Batal",
+        )
+        if enc_sel is None:
+            continue
+        encoding = "hex" if enc_sel == 0 else "base64"
+
+        try:
+            res = rsa_verify(message, signature, pubkey, padding=sig_padding, hash_algo=hash_algo, encoding=encoding)
+            status = "VALID (SAH)" if "VALID" in res.output_text else "INVALID (TIDAK SAH)"
+            card = render_card(
+                title=f"VERIFIKASI RSA SIGNATURE",
+                method=f"RSA-{res.algorithm}",
+                operation="VERIFY",
+                status=status,
+                input_text=message,
+                output_text=res.output_text,
+                reasons=["Verifikasi berhasil" if "VALID" in res.output_text else "Tanda tangan tidak cocok"],
+                extra_fields={"Algorithm": res.algorithm, "Key Size": f"{res.key_size} bit", "Status": status},
+            )
+            print("\n" + card)
+            log_history(f"RSA Verify", message, res.output_text, {"algo": res.algorithm})
+            if not post_result_menu(card, "hasil_rsa_verify.txt"):
+                break
+        except Exception as e:
+            print(red(f"  [!] Verifikasi gagal: {e}"))
+
+
+def handle_dh() -> None:
+    """Interactive handler for Diffie-Hellman Key Exchange."""
+    while True:
+        sel = navigation_menu(
+            options=[
+                "Simulasi Key Exchange (Alice & Bob)",
+                "Derive Key dari Shared Secret",
+            ],
+            title="CRYPTOLAB - DIFFIE-HELLMAN KEY EXCHANGE",
+            back_label="Kembali ke Menu Utama",
+        )
+        if sel is None:
+            break
+
+        try:
+            if sel == 0:
+                _handle_dh_exchange()
+            elif sel == 1:
+                _handle_dh_derive()
+        except BackToMenu:
+            continue
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan DH: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def _handle_dh_exchange() -> None:
+    """Handle DH key exchange simulation."""
+    while True:
+        size_sel = navigation_menu(
+            options=["2048 bit (Group 14)", "3072 bit (Group 15)", "4096 bit (Group 16)"],
+            title="DHKE - Pilih Ukuran Prime",
+            back_label="Kembali",
+        )
+        if size_sel is None:
+            break
+        bits = [2048, 3072, 4096][size_sel]
+
+        use_custom = safe_input("  Gunakan private key custom? (y/n) [n]: ").lower()
+        alice_priv = None
+        bob_priv = None
+        if use_custom in ("y", "ya", "yes"):
+            alice_hex = safe_input("  Alice private key (hex): ")
+            bob_hex = safe_input("  Bob private key (hex): ")
+            try:
+                alice_priv = int(alice_hex, 16) if alice_hex else None
+                bob_priv = int(bob_hex, 16) if bob_hex else None
+            except ValueError:
+                print(red("  [!] Private key harus hex valid."))
+                continue
+
+        res = dh_key_exchange(bits, alice_private=alice_priv, bob_private=bob_priv)
+
+        output = (
+            f"Prime (p): {res.prime_hex[:64]}... ({len(res.prime_hex)} hex chars)\n"
+            f"Generator (g): {res.generator}\n\n"
+            f"Alice Private: {res.alice_private_hex}\n"
+            f"Alice Public:  {res.alice_public_hex}\n\n"
+            f"Bob Private:   {res.bob_private_hex}\n"
+            f"Bob Public:    {res.bob_public_hex}\n\n"
+            f"SHARED SECRET: {res.shared_secret_hex}"
+        )
+        print("\n" + DIVIDER)
+        print(f"  DHKE {bits}-BIT KEY EXCHANGE")
+        print(DIVIDER)
+        print(output)
+        print(DIVIDER)
+
+        derive = safe_input("  Derive symmetric key dari shared secret? (y/n) [n]: ").lower()
+        if derive in ("y", "ya", "yes"):
+            keylen = safe_input("  Key length (bytes) [16]: ") or "16"
+            try:
+                kl = int(keylen)
+                derived = dh_derive_key(res.shared_secret_hex, key_length=kl)
+                print(f"\n  Derived Key ({kl} bytes): {derived}")
+            except Exception as e:
+                print(red(f"  [!] Gagal derive: {e}"))
+
+        log_history(f"DHKE {bits}", "", "EXCHANGE COMPLETE", {"bits": bits})
+        if not post_result_menu("", f"hasil_dh_{bits}.txt"):
+            break
+
+
+def _handle_dh_derive() -> None:
+    """Handle DH key derivation."""
+    while True:
+        shared = safe_input("  Masukkan shared secret (hex): ")
+        if not shared:
+            print(yellow("  [!] Shared secret tidak boleh kosong."))
+            continue
+
+        keylen = safe_input("  Key length (bytes) [32]: ") or "32"
+        try:
+            kl = int(keylen)
+        except ValueError:
+            print(red("  [!] Key length harus angka."))
+            continue
+
+        hash_sel = navigation_menu(
+            options=["SHA256", "SHA512"],
+            title="Key Derivation - Hash Algorithm",
+            back_label="Batal",
+        )
+        if hash_sel is None:
+            continue
+        hash_algo = "SHA256" if hash_sel == 0 else "SHA512"
+
+        enc_sel = navigation_menu(
+            options=["Hex", "Base64"],
+            title="Output Encoding",
+            back_label="Batal",
+        )
+        if enc_sel is None:
+            continue
+        encoding = "hex" if enc_sel == 0 else "base64"
+
+        try:
+            derived = dh_derive_key(shared, key_length=kl, hash_algo=hash_algo)
+            if encoding == "base64":
+                import base64
+                derived = base64.b64encode(bytes.fromhex(derived)).decode("ascii")
+            card = render_card(
+                title="DHKE KEY DERIVATION",
+                method=f"HKDF-{hash_algo}",
+                operation="DERIVE",
+                status="Berhasil (OK)",
+                input_text=f"Shared Secret: {shared[:32]}...",
+                output_text=derived,
+                reasons=[f"Key length: {kl} bytes", f"Hash: {hash_algo}"],
+                extra_fields={"Key Length": f"{kl} bytes", "Hash": hash_algo, "Encoding": encoding.upper()},
+            )
+            print("\n" + card)
+            log_history("DHKE Derive", shared, derived, {"keylen": kl, "hash": hash_algo})
+            if not post_result_menu(card, "hasil_dh_derive.txt"):
+                break
+        except Exception as e:
+            print(red(f"  [!] Derive gagal: {e}"))
+
+
+def handle_aes() -> None:
+    """Interactive handler for AES (Advanced Encryption Standard - 128 bit CBC/ECB)."""
+    while True:
+        # Main AES Menu with arrow key navigation
+        sel = navigation_menu(
+            options=[
+                "Dekripsi (Ciphertext Hex -> Plaintext)",
+                "Enkripsi (Plaintext -> Ciphertext Hex)",
+                "Auto Analisis Mode & Padding (Uji CBC & ECB)",
+            ],
+            title="CRYPTOLAB - AES (ADVANCED ENCRYPTION STANDARD - 128 BIT)",
+            back_label="Kembali ke Menu Utama",
+        )
+        
+        if sel is None:
+            break
+        
+        try:
+            if sel == 0:
                 # Dekripsi AES
-                ct_hex = safe_input("  Masukkan ciphertext (format heksadesimal): ")
-                if not ct_hex:
-                    print(yellow("  [!] Ciphertext heksadesimal tidak boleh kosong."))
-                    continue
-
-                clean_hex = re.sub(r"\s+", "", ct_hex)
-                if len(clean_hex) % 32 != 0:
-                    print(yellow(
-                        f"  [Perhatian] Panjang ciphertext ({len(clean_hex)} hex) bukan kelipatan ukuran blok AES (32 hex / 16 byte)."
-                    ))
-
-                print("\n  Pilih Mode AES:")
-                print("  [1] Auto (analisis heuristik mode dan padding yang valid)")
-                print("  [2] CBC (Cipher Block Chaining - membutuhkan IV 16 byte)")
-                print("  [3] ECB (Electronic Codebook - tanpa IV)")
-                print("  [0] Batal")
-                mode_choice = safe_input("  Pilih mode [1-3] [1]: ") or "1"
-
-                if mode_choice in ("0", "b"):
-                    continue
-
-                if mode_choice == "1":
-                    # Mode Auto
-                    key = safe_input("  Masukkan key (tepat 16 karakter/byte): ")
-                    if len(key.encode("utf-8")) != 16:
-                        print(red(f"  [!] Panjang key AES-128 harus tepat 16 byte. (Ditemukan: {len(key.encode('utf-8'))} byte)."))
-                        continue
-
-                    iv_cand = safe_input(
-                        "  Masukkan IV (16 karakter untuk mode CBC, atau tekan Enter jika tanpa IV): "
-                    )
-                    iv_val = iv_cand if len(iv_cand.encode("utf-8")) == 16 else None
-
-                    candidates: List[AesResult] = aes_auto_analyze(ct_hex, key=key, iv=iv_val)
-
-                    if not candidates:
-                        print(yellow("  [!] Tidak ada konfigurasi AES yang berhasil secara teknis."))
-                        continue
-
-                    top = candidates[0]
-                    card = render_card(
-                        title="HASIL ANALISIS AES (KANDIDAT TERBAIK)",
-                        method=f"AES-128 ({top.mode}, Padding {top.padding})",
-                        operation="Dekripsi",
-                        status="Kandidat ditemukan" if top.readable_success else "Dekripsi teknis berhasil (Plaintext belum terverifikasi)",
-                        input_text=ct_hex,
-                        output_text=top.output_text if top.is_utf8 else f"[Bytes Hex] {top.output_text}",
-                        reasons=top.reasons,
-                        extra_fields={
-                            "Mode": top.mode,
-                            "Padding": top.padding,
-                            "Status UTF-8": "Valid" if top.is_utf8 else "Non-UTF8 (Tampil Hex)",
-                        },
-                    )
-                    print("\n" + card)
-
-                    if len(candidates) > 1:
-                        print("\n  KANDIDAT MODE/PADDING LAIN:")
-                        print("  ------------------------------------------------------------------")
-                        for idx, c in enumerate(candidates[1:], start=1):
-                            prev = c.output_text[:35] + ("..." if len(c.output_text) > 35 else "")
-                            print(f"  [{idx}] Mode {c.mode} | Padding {c.padding} | Skor: {c.score:.1f}/100 -> {prev}")
-
-                    print(THIN_DIVIDER)
-                    print("  Catatan: Ciphertext heksadesimal tidak membuktikan mode CBC atau ECB.")
-                    print("  Hasil ditampilkan sebagai kandidat heuristik terverifikasi.")
-                    print(DIVIDER)
-
-                    # Do NOT log secret key/IV
-                    log_history("AES Auto Decrypt", ct_hex, top.output_text, {"mode": top.mode, "padding": top.padding})
-
-                    if not post_result_menu(card, "hasil_aes.txt"):
-                        break
-
-                elif mode_choice in ("2", "3"):
-                    mode = "CBC" if mode_choice == "2" else "ECB"
-                    key = safe_input("  Masukkan key (tepat 16 karakter/byte): ")
-                    if len(key.encode("utf-8")) != 16:
-                        print(red(f"  [!] Panjang key AES-128 harus tepat 16 byte. (Ditemukan: {len(key.encode('utf-8'))} byte)."))
-                        continue
-
-                    iv: Optional[str] = None
-                    if mode == "CBC":
-                        iv = safe_input("  Masukkan IV (tepat 16 karakter/byte): ")
-                        if len(iv.encode("utf-8")) != 16:
-                            print(red(f"  [!] Panjang IV AES CBC harus tepat 16 byte. (Ditemukan: {len(iv.encode('utf-8'))} byte)."))
-                            continue
-
-                    print("  Pilih padding:")
-                    print("  [1] PKCS#7 (standar default)")
-                    print("  [2] Tanpa Padding (None)")
-                    pad_choice = safe_input("  Pilih padding [1-2] [1]: ") or "1"
-                    padding = "PKCS7" if pad_choice == "1" else "None"
-
-                    res = aes_decrypt(ct_hex, key=key, mode=mode, iv=iv, padding=padding)
-
-                    status_msg = "Berhasil (Teks UTF-8 Terbaca)" if res.readable_success else "Berhasil Secara Teknis (Keterbacaan Rendah)"
-                    if not res.is_utf8:
-                        status_msg = "Berhasil Secara Teknis (Bukan teks UTF-8 valid - Hasil berupa Hex)"
-
-                    card = render_card(
-                        title="HASIL OPERASI CRYPTOLAB - AES DECRYPT",
-                        method=f"AES-128 ({mode})",
-                        operation="Dekripsi",
-                        status=status_msg,
-                        input_text=ct_hex,
-                        output_text=res.output_text if res.is_utf8 else f"[Bytes Hex] {res.output_text}",
-                        reasons=res.reasons,
-                        extra_fields={
-                            "Mode": mode,
-                            "Padding": padding,
-                            "Status UTF-8": "Valid" if res.is_utf8 else "Non-UTF8 (Tampil Hex)",
-                        },
-                    )
-                    print("\n" + card)
-
-                    # Do NOT log secret key/IV
-                    log_history("AES Decrypt", ct_hex, res.output_text, {"mode": mode, "padding": padding})
-
-                    if not post_result_menu(card, "hasil_aes.txt"):
-                        break
-
-            elif choice == "2":
+                _handle_aes_decrypt()
+            elif sel == 1:
                 # Enkripsi AES
-                plaintext = safe_input("  Masukkan plaintext untuk dienkripsi: ")
-                if not plaintext:
-                    print(yellow("  [!] Plaintext tidak boleh kosong."))
+                _handle_aes_encrypt()
+            elif sel == 2:
+                # Auto Analisis
+                _handle_aes_auto_analyze()
+        
+        except BackToMenu:
+            continue
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan AES: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
+
+
+def _handle_aes_decrypt() -> None:
+    """Handle AES decryption with mode selection."""
+    while True:
+        print("\n" + DIVIDER)
+        print("  AES DEKRIPSI - Pilih Mode")
+        print(DIVIDER)
+        
+        mode_sel = navigation_menu(
+            options=[
+                "Auto (analisis heuristik mode dan padding yang valid, key & IV opsional)",
+                "CBC (Cipher Block Chaining - membutuhkan IV 16 byte)",
+                "ECB (Electronic Codebook - tanpa IV)",
+            ],
+            title="AES DEKRIPSI - Pilih Mode",
+            back_label="Kembali ke Menu AES",
+        )
+        
+        if mode_sel is None:
+            break
+        
+        try:
+            ct_hex = safe_input("  Masukkan ciphertext (format heksadesimal): ")
+            if not ct_hex:
+                print(yellow("  [!] Ciphertext heksadesimal tidak boleh kosong."))
+                continue
+
+            clean_hex = re.sub(r"\s+", "", ct_hex)
+            if len(clean_hex) % 32 != 0:
+                print(yellow(
+                    f"  [Perhatian] Panjang ciphertext ({len(clean_hex)} hex) bukan kelipatan ukuran blok AES (32 hex / 16 byte)."
+                ))
+
+            if mode_sel == 0:
+                # Auto mode - key and IV are optional
+                print("\n  Mode Auto: Key dan IV opsional (tekan Enter untuk melewati)")
+                key = safe_input("  Masukkan key (tepat 16 karakter/byte, Enter untuk skip): ")
+                key_val = key if len(key.encode("utf-8")) == 16 else None
+                
+                iv = None
+                if key_val:
+                    iv_cand = safe_input("  Masukkan IV (16 karakter untuk CBC, Enter untuk skip/ECB): ")
+                    iv = iv_cand if len(iv_cand.encode("utf-8")) == 16 else None
+                
+                if key_val is None:
+                    print(yellow("  [!] Key dilewati. Auto analisis memerlukan key. Gunakan mode CBC/ECB manual."))
                     continue
 
-                print("\n  Pilih Mode AES:")
-                print("  [1] CBC (Cipher Block Chaining - membutuhkan IV 16 byte) [Default]")
-                print("  [2] ECB (Electronic Codebook - tanpa IV)")
-                mode_c = safe_input("  Pilih mode [1-2] [1]: ") or "1"
-                mode = "CBC" if mode_c == "1" else "ECB"
+                candidates: List[AesResult] = aes_auto_analyze(ct_hex, key=key_val, iv=iv)
 
+                if not candidates:
+                    print(yellow("  [!] Tidak ada konfigurasi AES yang berhasil secara teknis."))
+                    continue
+
+                top = candidates[0]
+                card = render_card(
+                    title="HASIL ANALISIS AES (KANDIDAT TERBAIK)",
+                    method=f"AES-128 ({top.mode}, Padding {top.padding})",
+                    operation="Dekripsi",
+                    status="Kandidat ditemukan" if top.readable_success else "Dekripsi teknis berhasil (Plaintext belum terverifikasi)",
+                    input_text=ct_hex,
+                    output_text=top.output_text if top.is_utf8 else f"[Bytes Hex] {top.output_text}",
+                    reasons=top.reasons,
+                    extra_fields={
+                        "Mode": top.mode,
+                        "Padding": top.padding,
+                        "Status UTF-8": "Valid" if top.is_utf8 else "Non-UTF8 (Tampil Hex)",
+                    },
+                )
+                print("\n" + card)
+
+                if len(candidates) > 1:
+                    print("\n  KANDIDAT MODE/PADDING LAIN:")
+                    print("  ------------------------------------------------------------------")
+                    for idx, c in enumerate(candidates[1:], start=1):
+                        prev = c.output_text[:35] + ("..." if len(c.output_text) > 35 else "")
+                        print(f"  [{idx}] Mode {c.mode} | Padding {c.padding} | Skor: {c.score:.1f}/100 -> {prev}")
+
+                print(THIN_DIVIDER)
+                print("  Catatan: Ciphertext heksadesimal tidak membuktikan mode CBC atau ECB.")
+                print("  Hasil ditampilkan sebagai kandidat heuristik terverifikasi.")
+                print(DIVIDER)
+
+                log_history("AES Auto Decrypt", ct_hex, top.output_text, {"mode": top.mode, "padding": top.padding})
+
+                if not post_result_menu(card, "hasil_aes.txt"):
+                    break
+
+            else:
+                mode = "CBC" if mode_sel == 1 else "ECB"
                 key = safe_input("  Masukkan key (tepat 16 karakter/byte): ")
                 if len(key.encode("utf-8")) != 16:
                     print(red(f"  [!] Panjang key AES-128 harus tepat 16 byte. (Ditemukan: {len(key.encode('utf-8'))} byte)."))
                     continue
 
-                iv = None
+                iv: Optional[str] = None
                 if mode == "CBC":
                     iv = safe_input("  Masukkan IV (tepat 16 karakter/byte): ")
                     if len(iv.encode("utf-8")) != 16:
@@ -922,62 +2362,160 @@ def handle_aes() -> None:
                         continue
 
                 print("  Pilih padding:")
-                print("  [1] PKCS#7 (standar default)")
-                print("  [2] Tanpa Padding (None - plaintext harus kelipatan 16 byte)")
-                pad_c = safe_input("  Pilih padding [1-2] [1]: ") or "1"
-                padding = "PKCS7" if pad_c == "1" else "None"
+                pad_sel = navigation_menu(
+                    options=["PKCS#7 (standar default)", "Tanpa Padding (None)"],
+                    title="AES DEKRIPSI - Pilih Padding",
+                    back_label="Batal",
+                )
+                if pad_sel is None:
+                    continue
+                padding = "PKCS7" if pad_sel == 0 else "None"
 
-                res_enc = aes_encrypt(plaintext, key=key, mode=mode, iv=iv, padding=padding)
+                res = aes_decrypt(ct_hex, key=key, mode=mode, iv=iv, padding=padding)
+
+                status_msg = "Berhasil (Teks UTF-8 Terbaca)" if res.readable_success else "Berhasil Secara Teknis (Keterbacaan Rendah)"
+                if not res.is_utf8:
+                    status_msg = "Berhasil Secara Teknis (Bukan teks UTF-8 valid - Hasil berupa Hex)"
 
                 card = render_card(
-                    title="HASIL OPERASI CRYPTOLAB - AES ENCRYPT",
+                    title="HASIL OPERASI CRYPTOLAB - AES DECRYPT",
                     method=f"AES-128 ({mode})",
-                    operation="Enkripsi",
-                    status="Berhasil (OK)",
-                    input_text=plaintext,
-                    output_text=res_enc.output_text,
-                    reasons=["Enkripsi selesai tanpa kesalahan"],
-                    extra_fields={"Mode": mode, "Padding": padding},
+                    operation="Dekripsi",
+                    status=status_msg,
+                    input_text=ct_hex,
+                    output_text=res.output_text if res.is_utf8 else f"[Bytes Hex] {res.output_text}",
+                    reasons=res.reasons,
+                    extra_fields={
+                        "Mode": mode,
+                        "Padding": padding,
+                        "Status UTF-8": "Valid" if res.is_utf8 else "Non-UTF8 (Tampil Hex)",
+                    },
                 )
                 print("\n" + card)
 
-                # Do NOT log secret key/IV
-                log_history("AES Encrypt", plaintext, res_enc.output_text, {"mode": mode, "padding": padding})
+                log_history("AES Decrypt", ct_hex, res.output_text, {"mode": mode, "padding": padding})
 
-                if not post_result_menu(card, "hasil_aes_encrypt.txt"):
+                if not post_result_menu(card, "hasil_aes.txt"):
                     break
 
-            elif choice == "3":
-                # Langsung ke Auto Analisis AES
-                ct_hex = safe_input("  Masukkan ciphertext heksadesimal: ")
-                key = safe_input("  Masukkan key jika tersedia, atau tekan Enter untuk melewati: ")
-                iv_input = safe_input("  Masukkan IV jika tersedia (khusus CBC), atau tekan Enter untuk melewati: ")
+        except BackToMenu:
+            break
+        except CryptoLabError as err:
+            print(red(f"\n  [!] Kesalahan AES: {err}"))
+        except Exception as err:
+            print(red(f"\n  [!] Kesalahan tak terduga: {err}"))
 
-                if not key:
-                    print(yellow("  [!] AES tidak dapat didekripsi tanpa key. Silakan peroleh key dari challenge lab."))
-                    continue
 
-                iv_val = iv_input if len(iv_input.encode("utf-8")) == 16 else None
-                candidates = aes_auto_analyze(ct_hex, key=key, iv=iv_val)
+def _handle_aes_encrypt() -> None:
+    """Handle AES encryption."""
+    while True:
+        plaintext = safe_input("  Masukkan plaintext untuk dienkripsi: ")
+        if not plaintext:
+            print(yellow("  [!] Plaintext tidak boleh kosong."))
+            continue
 
-                if candidates:
-                    top = candidates[0]
-                    card = render_card(
-                        title="HASIL ANALISIS AES",
-                        method=f"AES-128 ({top.mode}, Padding {top.padding})",
-                        operation="Auto Analisis",
-                        status="Kandidat ditemukan",
-                        input_text=ct_hex,
-                        output_text=top.output_text if top.is_utf8 else f"[Bytes Hex] {top.output_text}",
-                        reasons=top.reasons,
-                        extra_fields={"Mode": top.mode, "Padding": top.padding},
-                    )
-                    print("\n" + card)
-                    log_history("AES Auto Analyze", ct_hex, top.output_text, {"mode": top.mode, "padding": top.padding})
-                    if not post_result_menu(card, "hasil_aes_auto.txt"):
-                        break
-                else:
-                    print(yellow("  [!] Tidak ada kombinasi AES yang valid dengan parameter tersebut."))
+        mode_sel = navigation_menu(
+            options=[
+                "CBC (Cipher Block Chaining - membutuhkan IV 16 byte) [Default]",
+                "ECB (Electronic Codebook - tanpa IV)",
+            ],
+            title="AES ENKRIPSI - Pilih Mode",
+            back_label="Batal",
+        )
+        if mode_sel is None:
+            break
+        
+        mode = "CBC" if mode_sel == 0 else "ECB"
+
+        key = safe_input("  Masukkan key (tepat 16 karakter/byte): ")
+        if len(key.encode("utf-8")) != 16:
+            print(red(f"  [!] Panjang key AES-128 harus tepat 16 byte. (Ditemukan: {len(key.encode('utf-8'))} byte)."))
+            continue
+
+        iv = None
+        if mode == "CBC":
+            iv = safe_input("  Masukkan IV (tepat 16 karakter/byte): ")
+            if len(iv.encode("utf-8")) != 16:
+                print(red(f"  [!] Panjang IV AES CBC harus tepat 16 byte. (Ditemukan: {len(iv.encode('utf-8'))} byte)."))
+                continue
+
+        pad_sel = navigation_menu(
+            options=["PKCS#7 (standar default)", "Tanpa Padding (None - plaintext harus kelipatan 16 byte)"],
+            title="AES ENKRIPSI - Pilih Padding",
+            back_label="Batal",
+        )
+        if pad_sel is None:
+            continue
+        padding = "PKCS7" if pad_sel == 0 else "None"
+
+        res_enc = aes_encrypt(plaintext, key=key, mode=mode, iv=iv, padding=padding)
+
+        card = render_card(
+            title="HASIL OPERASI CRYPTOLAB - AES ENCRYPT",
+            method=f"AES-128 ({mode})",
+            operation="Enkripsi",
+            status="Berhasil (OK)",
+            input_text=plaintext,
+            output_text=res_enc.output_text,
+            reasons=["Enkripsi selesai tanpa kesalahan"],
+            extra_fields={"Mode": mode, "Padding": padding},
+        )
+        print("\n" + card)
+
+        log_history("AES Encrypt", plaintext, res_enc.output_text, {"mode": mode, "padding": padding})
+
+        if not post_result_menu(card, "hasil_aes_encrypt.txt"):
+            break
+
+
+def _handle_aes_auto_analyze() -> None:
+    """Handle AES auto analyze."""
+    while True:
+        print("\n" + DIVIDER)
+        print("  AES AUTO ANALISIS")
+        print(DIVIDER)
+        print("  Fitur ini menguji kombinasi mode (CBC/ECB) dan padding (PKCS7/None)")
+        print("  Key diperlukan, IV opsional (tekan Enter untuk melewati).")
+        print(THIN_DIVIDER)
+
+        try:
+            ct_hex = safe_input("  Masukkan ciphertext heksadesimal: ")
+            if not ct_hex:
+                print(yellow("  [!] Ciphertext tidak boleh kosong."))
+                continue
+
+            key = safe_input("  Masukkan key (tepat 16 karakter/byte, Enter untuk skip): ")
+            key_val = key if len(key.encode("utf-8")) == 16 else None
+            
+            iv_val: Optional[str] = None
+            if key_val:
+                iv_cand = safe_input("  Masukkan IV (16 karakter untuk CBC, Enter untuk skip): ")
+                iv_val = iv_cand if len(iv_cand.encode("utf-8")) == 16 else None
+            
+            if key_val is None:
+                print(yellow("  [!] Key dilewati. AES tidak dapat didekripsi tanpa key."))
+                continue
+
+            candidates = aes_auto_analyze(ct_hex, key=key_val, iv=iv_val)
+
+            if candidates:
+                top = candidates[0]
+                card = render_card(
+                    title="HASIL ANALISIS AES",
+                    method=f"AES-128 ({top.mode}, Padding {top.padding})",
+                    operation="Auto Analisis",
+                    status="Kandidat ditemukan",
+                    input_text=ct_hex,
+                    output_text=top.output_text if top.is_utf8 else f"[Bytes Hex] {top.output_text}",
+                    reasons=top.reasons,
+                    extra_fields={"Mode": top.mode, "Padding": top.padding},
+                )
+                print("\n" + card)
+                log_history("AES Auto Analyze", ct_hex, top.output_text, {"mode": top.mode, "padding": top.padding})
+                if not post_result_menu(card, "hasil_aes_auto.txt"):
+                    break
+            else:
+                print(yellow("  [!] Tidak ada kombinasi AES yang valid dengan parameter tersebut."))
 
         except BackToMenu:
             break
@@ -996,28 +2534,22 @@ def handle_base64() -> None:
         print("  Catatan: Base64 adalah ENCODING (bukan enkripsi kriptografi)")
         print("  dan tidak memerlukan key atau IV.")
         print(THIN_DIVIDER)
-        print("  [1] Encode (Teks UTF-8 -> Base64)")
-        print("  [2] Decode (Base64 -> Teks UTF-8)")
-        print("  [0] Kembali ke Menu Utama")
-        print(DIVIDER)
-
-        choice = safe_input("  Pilih operasi [0-2]: ", allow_back=False)
-        if choice in ("0", "b", "kembali"):
+        choice = navigation_menu(
+            options=["Encode (Teks UTF-8 -> Base64)", "Decode (Base64 -> Teks UTF-8)"],
+            title="CRYPTOLAB - BASE64 CODEC",
+            back_label="Kembali ke Menu Utama",
+        )
+        if choice is None:
             break
 
-
-        if choice not in ("1", "2"):
-            print(yellow("  [!] Pilihan tidak valid. Silakan pilih 1, 2, atau 0."))
-            continue
-
         try:
-            op_name = "Encode" if choice == "1" else "Decode"
+            op_name = "Encode" if choice == 0 else "Decode"
             data = safe_input(f"  Masukkan data untuk Base64 {op_name.lower()}: ")
             if not data:
                 print(yellow("  [!] Data tidak boleh kosong."))
                 continue
 
-            if choice == "1":
+            if choice == 0:
                 out = base64_encode(data)
                 card = render_card(
                     title="HASIL OPERASI CRYPTOLAB",
@@ -1065,22 +2597,16 @@ def handle_hex() -> None:
         print("  Catatan: Hexadecimal adalah ENCODING (bukan enkripsi kriptografi)")
         print("  dan tidak memerlukan key atau IV.")
         print(THIN_DIVIDER)
-        print("  [1] Encode (Teks UTF-8 -> Hex)")
-        print("  [2] Decode (Hex -> Teks UTF-8)")
-        print("  [0] Kembali ke Menu Utama")
-        print(DIVIDER)
-
-        choice = safe_input("  Pilih operasi [0-2]: ", allow_back=False)
-        if choice in ("0", "b", "kembali"):
+        choice = navigation_menu(
+            options=["Encode (Teks UTF-8 -> Hex)", "Decode (Hex -> Teks UTF-8)"],
+            title="CRYPTOLAB - HEXADECIMAL CODEC",
+            back_label="Kembali ke Menu Utama",
+        )
+        if choice is None:
             break
 
-
-        if choice not in ("1", "2"):
-            print(yellow("  [!] Pilihan tidak valid. Silakan pilih 1, 2, atau 0."))
-            continue
-
         try:
-            if choice == "1":
+            if choice == 0:
                 data = safe_input("  Masukkan teks untuk di-encode ke Hex: ")
                 if not data:
                     print(yellow("  [!] Teks tidak boleh kosong."))
@@ -1141,21 +2667,16 @@ def handle_binary() -> None:
         print("  Catatan: Binary adalah ENCODING (bukan enkripsi kriptografi)")
         print("  dan tidak memerlukan key atau IV.")
         print(THIN_DIVIDER)
-        print("  [1] Encode (Teks UTF-8 -> Biner 8-Bit)")
-        print("  [2] Decode (Biner 8-Bit -> Teks UTF-8)")
-        print("  [0] Kembali ke Menu Utama")
-        print(DIVIDER)
-
-        choice = safe_input("  Pilih operasi [0-2]: ")
-        if choice in ("0", "b", "kembali"):
+        choice = navigation_menu(
+            options=["Encode (Teks UTF-8 -> Biner 8-Bit)", "Decode (Biner 8-Bit -> Teks UTF-8)"],
+            title="CRYPTOLAB - BINARY CODEC (8-BIT)",
+            back_label="Kembali ke Menu Utama",
+        )
+        if choice is None:
             break
 
-        if choice not in ("1", "2"):
-            print(yellow("  [!] Pilihan tidak valid. Silakan pilih 1, 2, atau 0."))
-            continue
-
         try:
-            if choice == "1":
+            if choice == 0:
                 data = safe_input("  Masukkan teks untuk di-encode ke Biner: ")
                 if not data:
                     print(yellow("  [!] Teks tidak boleh kosong."))
@@ -1235,14 +2756,15 @@ def handle_history() -> None:
                 print(f"  {time_str:<20} | {op_str:<23} | {preview}")
             print(DIVIDER)
 
-        print("  Opsi:")
-        print("  [1] Bersihkan Seluruh Riwayat")
-        print("  [0] Kembali ke Menu Utama")
-        choice = safe_input("  Pilih opsi [0-1] [0]: ", allow_back=True)
+        choice = navigation_menu(
+            options=["Bersihkan Seluruh Riwayat", "Kembali ke Menu Utama"],
+            title="RIWAYAT - PILIH OPSI",
+            back_label="Kembali ke Menu Utama",
+        )
 
-        if choice in ("0", "", "b", "kembali"):
+        if choice is None or choice == 1:
             break
-        elif choice == "1":
+        elif choice == 0:
             confirm = safe_input("  Yakin ingin menghapus seluruh riwayat? (y/n) [n]: ", allow_back=False).lower()
             if confirm in ("y", "ya", "yes"):
                 success = clear_history()
@@ -1250,8 +2772,6 @@ def handle_history() -> None:
                     print(green("  [OK] Riwayat analisis lokal berhasil dibersihkan."))
                 else:
                     print(red("  [!] Gagal menghapus file riwayat."))
-        else:
-            print(yellow("  [!] Pilihan tidak valid. Silakan pilih 0 atau 1."))
 
 
 # ======================================================================
@@ -1259,54 +2779,80 @@ def handle_history() -> None:
 # ======================================================================
 
 def run_interactive_menu() -> None:
-    """Run interactive terminal menu for CryptoLab."""
+    """Run CryptoLab in a dedicated terminal screen when attached to a TTY."""
+    use_alt_screen = bool(getattr(sys.stdout, "isatty", lambda: False)())
+    if use_alt_screen:
+        sys.stdout.write("\033[?1049h\033[2J\033[H")
+        sys.stdout.flush()
+    try:
+        _run_interactive_menu()
+    finally:
+        if use_alt_screen:
+            sys.stdout.write("\033[?1049l")
+            sys.stdout.flush()
+
+
+def _run_interactive_menu() -> None:
+    """Run the interactive menu loop inside the active terminal screen."""
     while True:
-        print("\n" + DIVIDER)
-        print(bold(f"  CRYPTOLAB CLI v{__version__} - TOOLKIT KRIPTOGRAFI & ENCODING"))
-        print(DIVIDER)
-        print("  [1] Auto Analyze")
-        print("  [2] Caesar Cipher")
-        print("  [3] Vigenere Cipher")
-        print("  [4] DES (Data Encryption Standard - 64 bit)")
-        print("  [5] AES (Advanced Encryption Standard - 128 bit)")
-        print("  [6] Base64")
-        print("  [7] Hex")
-        print("  [8] Binary")
-        print("  [9] Riwayat")
-        print("  [0] Keluar (atau '10')")
-        print(DIVIDER)
+        sel = navigation_menu(
+            options=[
+                "Auto Analyze",
+                "Caesar Cipher",
+                "Vigenere Cipher",
+                "DES (Data Encryption Standard - 64 bit)",
+                "AES (Advanced Encryption Standard - 128 bit)",
+                "RC2 (ARC2 - Legacy 64 bit)",
+                "Hashing & Password Security (MD5, SHA, HMAC, PBKDF2, Bcrypt)",
+                "RSA Asymmetric Cryptography (KeyGen, Encrypt, Decrypt, Sign, Verify)",
+                "Diffie-Hellman Key Exchange (DHKE)",
+                "Base64",
+                "Hex",
+                "Binary",
+                "Riwayat",
+                "Keluar",
+            ],
+            title=f"CRYPTOLAB CLI v{__version__} - TOOLKIT KRIPTOGRAFI & ENCODING",
+            back_label="Keluar",
+            allow_back=False,
+            banner=LOGO,
+            banner_responsive=True,
+        )
 
-        try:
-            choice = safe_input("  Pilih menu [0-9]: ", allow_back=False)
-        except (KeyboardInterrupt, EOFError):
-            print("\n\n  Terima kasih telah menggunakan CryptoLab CLI. Sampai jumpa!\n")
-            break
-
-        if choice in ("0", "10", "q", "keluar", "exit"):
+        if sel is None:
             print("\n  Terima kasih telah menggunakan CryptoLab CLI. Sampai jumpa!\n")
             break
 
         try:
-            if choice == "1":
+            if sel == 0:
                 handle_auto_analyze()
-            elif choice == "2":
+            elif sel == 1:
                 handle_caesar()
-            elif choice == "3":
+            elif sel == 2:
                 handle_vigenere()
-            elif choice == "4":
+            elif sel == 3:
                 handle_des()
-            elif choice == "5":
+            elif sel == 4:
                 handle_aes()
-            elif choice == "6":
+            elif sel == 5:
+                handle_rc2()
+            elif sel == 6:
+                handle_hashing()
+            elif sel == 7:
+                handle_rsa()
+            elif sel == 8:
+                handle_dh()
+            elif sel == 9:
                 handle_base64()
-            elif choice == "7":
+            elif sel == 10:
                 handle_hex()
-            elif choice == "8":
+            elif sel == 11:
                 handle_binary()
-            elif choice == "9":
+            elif sel == 12:
                 handle_history()
-            else:
-                print(yellow("  [!] Pilihan tidak valid. Silakan masukkan nomor antara 0 dan 9 (atau 10/q untuk keluar)."))
+            elif sel == 13:
+                print("\n  Terima kasih telah menggunakan CryptoLab CLI. Sampai jumpa!\n")
+                break
         except BackToMenu:
             continue
 

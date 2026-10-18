@@ -11,6 +11,7 @@ authors = [{ name = "Praktikan Keamanan Informasi" }]
 requires-python = ">=3.9"
 dependencies = [
     "pycryptodome>=3.15.0",
+    "readchar>=4.0.0",
 ]
 
 [project.optional-dependencies]
