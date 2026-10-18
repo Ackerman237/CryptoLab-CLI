@@ -1,6 +1,6 @@
 """CryptoLab CLI - Toolkit Kriptografi dan Encoding untuk Praktikum Keamanan Informasi."""
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 __author__ = "Praktikan Keamanan Informasi"
 
 from cryptolab.hashing import (
