@@ -217,8 +217,10 @@ def handle_auto_analyze() -> None:
                     user_key = key_input
                     key_bytes_len = len(user_key.encode("utf-8"))
 
-                    # If AES is applicable (or key is 16 bytes)
-                    if "AES" in report.possible_keyed_ciphers or key_bytes_len == 16:
+                    # AES uses a 16-byte key; DES and RC2 use an 8-byte key.
+                    if key_bytes_len == 16 and (
+                        "AES" in report.possible_keyed_ciphers or not report.possible_keyed_ciphers
+                    ):
                         if key_bytes_len != 16:
                             print(yellow(f"  [Perhatian] Panjang key AES-128 harus tepat 16 byte (saat ini: {key_bytes_len} byte)."))
                         else:
@@ -232,13 +234,14 @@ def handle_auto_analyze() -> None:
                                 else:
                                     user_iv = iv_input
 
-                    # If DES is applicable (or key is 8 bytes)
-                    elif "DES" in report.possible_keyed_ciphers or key_bytes_len == 8:
+                    elif key_bytes_len == 8 and (
+                        "DES" in report.possible_keyed_ciphers or "RC2" in report.possible_keyed_ciphers
+                    ):
                         if key_bytes_len != 8:
                             print(yellow(f"  [Perhatian] Panjang key DES harus tepat 8 byte (saat ini: {key_bytes_len} byte)."))
                         else:
                             iv_input = safe_input(
-                                "  Metode DES CBC membutuhkan IV (8 byte). Masukkan IV jika ada, atau tekan Enter untuk mode ECB saja: "
+                                "  Metode DES/RC2 CBC membutuhkan IV (8 byte). Masukkan IV jika ada, atau tekan Enter untuk mode ECB saja: "
                             )
                             if iv_input:
                                 iv_bytes_len = len(iv_input.encode("utf-8"))
@@ -246,6 +249,9 @@ def handle_auto_analyze() -> None:
                                     print(yellow(f"  [Perhatian] Panjang IV DES CBC harus tepat 8 byte. Melewati CBC ber-IV."))
                                 else:
                                     user_iv = iv_input
+
+                    elif "AES" in report.possible_keyed_ciphers:
+                        print(yellow(f"  [Perhatian] Panjang key AES-128 harus tepat 16 byte (saat ini: {key_bytes_len})."))
 
                     # Re-run analysis with supplied parameters
                     report = run_auto_analysis(ciphertext, key=user_key, iv=user_iv)

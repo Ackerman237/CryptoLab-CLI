@@ -4,6 +4,7 @@ import pytest
 from cryptolab.analysis.brute_force import caesar_brute_force
 from cryptolab.analysis.detect import detect_format
 from cryptolab.analysis.auto_decode import auto_decode
+from cryptolab.analysis.auto_engine import run_auto_analysis
 from cryptolab.encoding.base64_codec import base64_encode
 from cryptolab.encoding.hex_codec import hex_encode
 from cryptolab.encoding.binary_codec import binary_encode
@@ -162,6 +163,15 @@ class TestAutoEngine:
         assert report_keyed.top_candidate is not None
         assert "DES" in report_keyed.top_candidate.method
         assert report_keyed.top_candidate.output_text == "des_enkripsi"
+
+    def test_keyed_cipher_detection_rc2_challenge(self):
+        ciphertext = "c73ded509ad5c3039cf3cb63ce5448d1ace59962c45889a23ab61bb826eeebf8"
+        report = run_auto_analysis(ciphertext, key="12345678", iv="qwertyui")
+
+        assert "RC2" in report.possible_keyed_ciphers
+        assert report.top_candidate is not None
+        assert report.top_candidate.method == "RC2 (CBC, Padding PKCS7)"
+        assert report.top_candidate.output_text == "laboratorium_keamanan_3d"
 
     def test_auto_analyze_vigenere_with_key(self):
         from cryptolab.analysis.auto_engine import run_auto_analysis

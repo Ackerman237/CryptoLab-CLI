@@ -222,12 +222,13 @@ def run_auto_analysis(
         except Exception:
             pass
 
-    # 4. Check for Keyed Cipher Potential (AES, DES, Vigenere)
+    # 4. Check for Keyed Cipher Potential (AES, DES, RC2, Vigenere)
     if is_potential_aes_hex(cleaned_input):
         possible_keyed.append("AES")
 
     if is_potential_des_hex(cleaned_input):
         possible_keyed.append("DES")
+        possible_keyed.append("RC2")
 
     if is_potential_vigenere(cleaned_input):
         possible_keyed.append("Vigenere")
@@ -303,6 +304,44 @@ def run_auto_analysis(
                                 needs_key=True,
                                 mode=dr.mode,
                                 padding=dr.padding,
+                            )
+                        )
+            except Exception:
+                pass
+
+        # Check RC2/ARC2. RC2 shares DES's 64-bit block size, so both are
+        # candidates for the same hexadecimal ciphertext shape.
+        if "RC2" in possible_keyed or is_potential_des_hex(cleaned_input):
+            try:
+                from cryptolab.symmetric.rc2 import rc2_auto_analyze
+
+                rc2_results = rc2_auto_analyze(cleaned_input, key=key, iv=iv)
+                for rr in rc2_results:
+                    if rr.technical_success:
+                        status_str = "Dekripsi RC2 berhasil (Teks terbaca)" if rr.readable_success else "Dekripsi teknis berhasil (Kandidat mode/padding)"
+                        mode_iv_info = f"RC2 ({rr.mode}, Padding {rr.padding})"
+                        reasons_list = list(rr.reasons)
+                        if not rr.is_utf8:
+                            reasons_list.append("Hasil berupa bytes non-UTF8 (ditampilkan dalam format heksadesimal)")
+                        reasons_list.append("RC2 adalah cipher legacy 64-bit; effective key length default 128-bit.")
+
+                        candidates.append(
+                            AutoCandidate(
+                                method=mode_iv_info,
+                                category="Kriptografi Simetris Legacy",
+                                operation="Decrypt",
+                                status=status_str,
+                                input_text=cleaned_input,
+                                output_text=rr.output_text,
+                                score=rr.score,
+                                score_level="Tinggi" if rr.readable_success else "Rendah",
+                                flag_detected="flag{" in rr.output_text.lower(),
+                                reasons=reasons_list,
+                                steps=[f"RC2 Decrypt ({rr.mode}, {rr.padding})"],
+                                is_verified=rr.readable_success,
+                                needs_key=True,
+                                mode=rr.mode,
+                                padding=rr.padding,
                             )
                         )
             except Exception:

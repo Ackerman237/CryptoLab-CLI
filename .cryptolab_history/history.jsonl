@@ -1,0 +1,2 @@
+{"timestamp": "2026-10-18T17:30:34.748381+00:00", "operation": "Auto Analyze", "params": {"method": "RC2 (CBC, Padding PKCS7)", "score": 72.1}, "input": "c73ded509ad5c3039cf3cb63ce5448d1ace59962c45889a23ab61bb826eeebf8", "output": "laboratorium_keamanan_3d"}
+{"timestamp": "2026-10-18T17:31:26.608490+00:00", "operation": "Auto Analyze", "params": {"method": "RC2 (CBC, Padding PKCS7)", "score": 72.1}, "input": "c73ded509ad5c3039cf3cb63ce5448d1ace59962c45889a23ab61bb826eeebf8", "output": "laboratorium_keamanan_3d"}

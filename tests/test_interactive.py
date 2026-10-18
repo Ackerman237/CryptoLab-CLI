@@ -199,6 +199,20 @@ class TestInteractive:
         captured = capsys.readouterr().out
         assert "des_enkripsi" in captured
 
+    def test_auto_analyze_rc2_challenge_flow(self, monkeypatch, capsys):
+        # Auto Analyze with RC2 challenge -> asks key -> "12345678" -> asks IV -> "qwertyui" -> 0 to return
+        inputs = iter([
+            "c73ded509ad5c3039cf3cb63ce5448d1ace59962c45889a23ab61bb826eeebf8",
+            "12345678",
+            "qwertyui",
+            "0",
+        ])
+        monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+        handle_auto_analyze()
+        captured = capsys.readouterr().out
+        assert "laboratorium_keamanan_3d" in captured
+        assert "RC2 (CBC, Padding PKCS7)" in captured
+
     def test_history_interactive_view_and_clear(self, monkeypatch, capsys):
         # View history -> Option 1 (clear) -> confirm "y" -> option 0 (return)
         inputs = iter([

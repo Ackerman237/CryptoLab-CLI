@@ -27,6 +27,7 @@ from cryptolab.utils.history import (
 )
 from cryptolab.symmetric.des import des_encrypt, des_decrypt, des_auto_analyze
 from cryptolab.symmetric.aes import aes_encrypt, aes_decrypt, aes_auto_analyze
+from cryptolab.symmetric.rc2 import rc2_encrypt, rc2_decrypt, rc2_auto_analyze
 from cryptolab.interactive import run_interactive_menu
 
 
@@ -548,6 +549,33 @@ def create_parser() -> argparse.ArgumentParser:
         help="Skema padding: PKCS7 (default) atau None",
     )
 
+    # RC2 / ARC2 (CBC / ECB)
+    rc2_parser = subparsers.add_parser(
+        "rc2", help="Operasi RC2 (ARC2) CBC/ECB untuk kompatibilitas cipher legacy"
+    )
+    rc2_parser.add_argument(
+        "action", choices=["encrypt", "decrypt", "auto"],
+        help="Aksi: encrypt, decrypt, atau auto",
+    )
+    rc2_parser.add_argument(
+        "-t", "--text", required=True,
+        help="Plaintext (encrypt) atau ciphertext heksadesimal (decrypt/auto)",
+    )
+    rc2_parser.add_argument("-k", "--key", default=None, help="Kunci RC2 sepanjang 5-16 byte")
+    rc2_parser.add_argument(
+        "-m", "--mode", default="CBC", choices=["CBC", "ECB", "cbc", "ecb"],
+        help="Mode RC2: CBC atau ECB (default: CBC)",
+    )
+    rc2_parser.add_argument("--iv", default=None, help="IV CBC sepanjang tepat 8 byte")
+    rc2_parser.add_argument(
+        "-p", "--padding", default="PKCS7", choices=["PKCS7", "None", "pkcs7", "none"],
+        help="Skema padding: PKCS7 (default) atau None",
+    )
+    rc2_parser.add_argument(
+        "--effective-keylen", type=int, default=128,
+        help="Effective key length RC2 dalam bit (default: 128; rentang 40-1024)",
+    )
+
     return parser
 
 
@@ -809,6 +837,43 @@ def handle_cli_args(args: argparse.Namespace) -> int:
                 )
                 log_history("AES Decrypt", args.text, dec_res.output_text, {"mode": norm_mode, "padding": norm_padding}, enabled=history_enabled)
                 return 0
+
+        if args.command == "rc2":
+            norm_mode = args.mode.upper()
+            norm_padding = "PKCS7" if args.padding.upper() == "PKCS7" else "None"
+            effective_keylen = args.effective_keylen
+
+            if args.action == "auto":
+                candidates = rc2_auto_analyze(
+                    args.text, key=args.key, iv=args.iv, effective_keylen=effective_keylen
+                )
+                if not candidates:
+                    print(render_error("RC2 Auto", "Tidak ada konfigurasi RC2 yang berhasil didekripsi."))
+                    return 1
+                best_rc2 = candidates[0]
+                print(render_box(
+                    "Hasil RC2 Auto", f"RC2 Auto ({best_rc2.mode}, Padding {best_rc2.padding})",
+                    args.text, best_rc2.output_text,
+                    {"Mode": best_rc2.mode, "Padding": best_rc2.padding,
+                     "Effective": f"{effective_keylen} bit", "Skor": f"{best_rc2.score:.1f}/100"},
+                ))
+                log_history("RC2 Auto", args.text, best_rc2.output_text,
+                            {"mode": best_rc2.mode, "padding": best_rc2.padding}, enabled=history_enabled)
+                return 0
+
+            if not args.key:
+                raise InvalidInputError("Operasi encrypt/decrypt RC2 memerlukan parameter --key / -k.")
+            params = {"Mode": norm_mode, "Padding": norm_padding, "Effective": f"{effective_keylen} bit"}
+            if args.action == "encrypt":
+                result = rc2_encrypt(args.text, args.key, norm_mode, args.iv, norm_padding, effective_keylen)
+                print(render_box("Hasil Enkripsi RC2", f"RC2 ({norm_mode}) (ENCRYPT)", args.text, result.output_text, params))
+                log_history("RC2 Encrypt", args.text, result.output_text, params, enabled=history_enabled)
+            else:
+                result = rc2_decrypt(args.text, args.key, norm_mode, args.iv, norm_padding, effective_keylen)
+                params["UTF-8"] = "Ya" if result.is_utf8 else "Tidak (Hex)"
+                print(render_box("Hasil Dekripsi RC2", f"RC2 ({norm_mode}) (DECRYPT)", args.text, result.output_text, params))
+                log_history("RC2 Decrypt", args.text, result.output_text, params, enabled=history_enabled)
+            return 0
 
 
 
