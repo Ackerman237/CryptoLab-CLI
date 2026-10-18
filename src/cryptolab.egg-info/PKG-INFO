@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: cryptolab
+Version: 0.1.0
+Summary: CLI Encryption, Decryption, and Encoding Toolkit for Security Labs
+Author: Praktikan Keamanan Informasi
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"

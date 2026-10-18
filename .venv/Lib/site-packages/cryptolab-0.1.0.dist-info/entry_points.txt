@@ -1,0 +1,2 @@
+[console_scripts]
+cryptolab = cryptolab.main:main

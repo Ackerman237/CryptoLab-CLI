@@ -1,22 +1,22 @@
 # Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# __pycache__/
+# *.py[cod]
+# *$py.class
 
 # Distribution / packaging
-dist/
-build/
-*.egg-info/
+# dist/
+# build/
+# *.egg-info/
 
 # Virtual environment
-.venv/
-env/
-venv/
+# .venv/
+# env/
+# venv/
 
 # Pytest cache
-.pytest_cache/
-.coverage
-htmlcov/
+# .pytest_cache/
+# .coverage
+# htmlcov/
 
 # Local history
-.cryptolab_history/
+# .cryptolab_history/
