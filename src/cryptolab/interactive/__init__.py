@@ -3,10 +3,10 @@
 from cryptolab.ui import Color, Symbol, term_width, term_height, center_block, render_footer, render_header, HINTS_MAIN, HINTS_SUB
 
 # Define HEADER_SUBTITLE here to avoid circular imports
-HEADER_SUBTITLE = "CRYPTOLAB CLI v0.1.0 · TOOLKIT KRIPTOGRAFI & ENCODING"
+HEADER_SUBTITLE = "CRYPTOLAB CLI v1.0.0 · TOOLKIT KRIPTOGRAFI & ENCODING"
 
 from cryptolab.ui.widgets.menu import Menu, navigation_menu
-from cryptolab.interactive.menu import get_main_menu_labels, get_main_menu_handlers
+from cryptolab.interactive.menu import get_main_menu_labels, get_main_menu_handlers, MAIN_MENU_LABELS as MAIN_LABELS
 from cryptolab.interactive.handlers import (
     handle_auto_analyze,
     handle_caesar,
@@ -26,6 +26,22 @@ from cryptolab.interactive.handlers import (
     handle_binary,
     handle_history,
 )
+
+# save_result_prompt - defined inline to avoid circular import with interactive.py module
+def save_result_prompt(content: str, default_filename: str = "hasil_cryptolab.txt") -> None:
+    """Prompt user to optionally save text content to a file."""
+    from pathlib import Path
+    from cryptolab.ui import safe_input, Color
+    try:
+        choice = safe_input(f"\n  Simpan hasil ke file? (y/n) [n]: ", allow_back=False).lower()
+        if choice in ("y", "ya", "yes"):
+            fn_input = safe_input(f"  Nama file [{default_filename}]: ", allow_back=False)
+            filename = fn_input or default_filename
+            filepath = Path(filename)
+            filepath.write_text(content, encoding="utf-8")
+            print(Color.green(f"  [OK] Hasil berhasil disimpan ke: {filepath.resolve()}"))
+    except Exception as err:
+        print(Color.red(f"  [!] Gagal menyimpan file: {err}"))
 
 # Backward compatibility - internal functions used by tests
 from cryptolab.ui.layout import clear_screen, hide_cursor, show_cursor
@@ -257,4 +273,6 @@ __all__ = [
     "handle_auto_analyze",
     # History
     "handle_history",
+    # UI
+    "save_result_prompt",
 ]

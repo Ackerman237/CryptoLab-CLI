@@ -5,22 +5,36 @@ import sys
 from typing import Optional
 
 # ============================================================
-# Logo definitions (progressive sizes - block style)
+# Logo definitions (SVG-style block pixel font - CRYPTOLAB)
 # ============================================================
 
+# CRYPTOLAB in 5x7 block font, clean and crisp
 LOGO_LARGE = """\
-▄▀▀▀▀ █▀▀▀▄ █   █ █▀▀▀▄ ▀▀█▀▀ ▄▀▀▀▄ █     ▄▀▀▀▄ █▀▀▀▄
-█     █▀▀█   ▀▄▀  █▀▀▀    █   █   █ █     █▀▀▀█ █▀▀▀▄
-▀▀▀▀ ▀   ▀   ▀   ▀       ▀    ▀▀▀  ▀▀▀▀▀ ▀   ▀ ▀▀▀▀"""
+██████  ██████  ██    ██ ██████  ████████  ██████  ██       █████  ██████
+██      ██   ██  ██  ██  ██   ██ ██    ██ ██   ██ ██      ██   ██ ██   ██
+██      ██████    ████   ██████  ██    ██ ██████  ██      ███████ ██████
+██      ██   ██    ██    ██      ██    ██ ██   ██ ██      ██   ██ ██   ██
+ ██████ ██   ██    ██    ██      ██     ██████  ███████ ██   ██ ██   ██"""
 
 LOGO_MEDIUM = """\
-▄▀▀▀▀ █▀▀▀▄ █   █ █▀▀▀▄
-█     █▀▀█   ▀▄▀  █▀▀▀
-▀▀▀▀ ▀   ▀   ▀   ▀"""
+██████ ██████ ██  ██ ██████ ████████ ██████ ██    █████ ██████
+██     ██  ██ ██ ██  ██  ██ ██    ██ ██     ██   ██ ██   ██
+██     ██████ ████   ██████ ██    ██ █████  ██   ███████ ██████
+██     ██  ██ ██ ██  ██     ██    ██ ██     ██   ██ ██   ██
+ ██████ ██  ██ ██  ██ ██     ██     ██████ ███████ ██ ██   ██"""
+
+LOGO_SMALL = """\
+██████ ██████ ██  ██ ██████ ████████ ██████
+██     ██  ██ ██ ██  ██  ██ ██    ██ ██   
+██     ██████ ████   ██████ ██    ██ █████ 
+██     ██  ██ ██ ██  ██     ██    ██ ██   
+ ██████ ██  ██ ██  ██ ██     ██     ██████"""
 
 LOGO_TINY = "CRYPTOLAB"
 
-LOGO = LOGO_MEDIUM
+# SVG path data for reference (5x7 pixel font for "CRYPTOLAB")
+# Each letter is 5x7 blocks, total width ~53 chars, height 5 lines
+# The SVG provided uses crispEdges for pixel-perfect rendering
 
 # ============================================================
 # Color constants
@@ -32,6 +46,7 @@ WHITE = "\033[97m"
 GREEN = "\033[32m"
 RED = "\033[31m"
 CYAN = "\033[36m"
+YELLOW = "\033[33m"
 
 def paint(text: str, style: str = "") -> str:
     """Apply ANSI style to text."""
@@ -63,7 +78,7 @@ def center_block(text: str, width: int, offset: int = 0) -> str:
 
 def pick_logo(width: int, max_rows: int = 99) -> str:
     """Pick largest logo that fits width AND height."""
-    for logo in (LOGO_LARGE, LOGO_MEDIUM):
+    for logo in (LOGO_LARGE, LOGO_MEDIUM, LOGO_SMALL):
         if _block_width(logo) <= width and len(logo.splitlines()) <= max_rows:
             return logo
     return LOGO_TINY
@@ -111,7 +126,6 @@ def _clip(text: str, width: int) -> str:
 # ============================================================
 # Security Warnings
 # ============================================================
-YELLOW = "\033[33m"
 
 def warn_weak_hash(algorithm: str) -> str:
     """Return warning message for weak hash algorithms."""
