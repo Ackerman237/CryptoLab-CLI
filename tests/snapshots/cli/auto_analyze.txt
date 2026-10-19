@@ -1,0 +1,18 @@
+======================================================================
+  CRYPTOLAB CLI - MULTI-STAGE AUTO-DECODE PIPELINE
+======================================================================
+  Status       : Transformasi selesai pada kedalaman ke-1.
+  Total Tahap  : 1
+  Skor Akhir   : 70.4/100 (Tinggi)
+  Indikator    : Karakter terbaca/printable: 100.0%; Proporsi alfabet: 90.9%; Rasio vokal alami (30.0%)
+----------------------------------------------------------------------
+  URUTAN TRANSFORMASI TERBAIK:
+  [Tahap 1] Base64
+   - Input  : SGVsbG8gV29ybGQ=
+   - Output : Hello World
+----------------------------------------------------------------------
+  HASIL AKHIR (KANDIDAT UTAMA):
+  Hello World
+======================================================================
+  CATATAN: Verifikasi manual disarankan jika hasil berupa kode/flag.
+======================================================================

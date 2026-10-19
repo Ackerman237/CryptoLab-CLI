@@ -1,0 +1,17 @@
+======================================================================
+  CRYPTOLAB CLI - ANALISIS DETEKSI FORMAT
+======================================================================
+  Input Teks  : SGVsbG8gV29ybGQ=
+----------------------------------------------------------------------
+  Format      | Status | Keyakinan | UTF-8 | Preview Hasil Dekode
+  ------------+--------+-----------+-------+-------------------------
+  Binary      | NO     | None      | Tidak | Karakter mengandung no...
+  Hexadecimal | NO     | None      | Tidak | Mengandung karakter di...
+  Base64      | MATCH  | High      | Ya    | Hello World
+======================================================================
+  HASIL ANALISIS:
+  - [Base64] Panjang 16 karakter, charset Base64 valid, teks UTF-8 valid. (Skor: 70.4/100)
+======================================================================
+  PERHATIAN: Deteksi bersifat heuristik/indikatif dan tidak dijamin
+  100% pasti benar. Selalu verifikasi konteks data laboratorium.
+======================================================================

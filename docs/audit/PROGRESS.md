@@ -30,10 +30,10 @@
 
 | Step | Task | Status | Verifikasi | Catatan |
 |------|------|--------|------------|---------|
-| B1 | Test snapshot semua CLI command output | `[ ]` | `pytest tests/test_cli_snapshot.py` | New test file |
-| B2 | Test snapshot interactive menu rendering | `[ ]` | Mock stdin/stdout | New test file |
-| B3 | Test semua crypto primitive (round-trip) | `[ ]` | Encrypt→decrypt = identity | New test file |
-| B4 | Test history log format & secrets filtering | `[ ]` | Check no keys in output | New test file |
+| B1 | Test snapshot semua CLI command output | `[x]` | `pytest tests/test_cli_snapshot.py` | 19 snapshots created |
+| B2 | Test snapshot interactive menu rendering | `[x]` | `pytest tests/test_interactive_snapshot.py` | 13 tests pass |
+| B3 | Test semua crypto primitive (round-trip) | `[x]` | `pytest tests/test_crypto_roundtrip.py` | 41 passed, 2 skipped |
+| B4 | Test history log format & secrets filtering | `[x]` | `pytest tests/test_history_security.py` | 22 tests pass |
 
 ---
 

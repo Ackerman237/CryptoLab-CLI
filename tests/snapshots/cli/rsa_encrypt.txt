@@ -1,0 +1,15 @@
+======================================================================
+  CRYPTOLAB CLI v1.0.0 - HASIL RSA ENKRIPSI
+======================================================================
+  Operasi     : RSA-RSA-PKCS1v15 (ENCRYPT)
+  Algorithm   : RSA-PKCS1v15
+  Key Size    : 2048 bit
+  Encoding    : HEX
+  Status      : BERHASIL (OK)
+----------------------------------------------------------------------
+  INPUT:
+  test message
+----------------------------------------------------------------------
+  OUTPUT:
+  94a78ea65a42683e9e8f386aa9ec7d60e091342cb3c9f4324435b8c8aa3f0ba56dd0efc4a82e3ff7404a38a492a58189fbd1333906a34ea6b0929179e3185bfb6947dfffbbae73da15551e68d9deb80c20bc61de653cc7cba8c813d1bb83ccee976d4fa1a85038ab99b04fc0277caf929a1d608813203d7cdca0fa0aadb9bff9b81b99a45edb5655a4dc02ea36ccb1792be0fd4da5d151204cb00bc865451b72c525e6ca9816d59097b6f0adaeae2803f2fc6fedffed7fe93e7e6c3996bec32e7672f9bf617b56c843a40c9f05d978de4fca5ac9746c2015cb913c552db2c06557cacae932309a0b59f844f42edd1f62c8a258cfcec4e21a0670cde54bfbfed5
+======================================================================
