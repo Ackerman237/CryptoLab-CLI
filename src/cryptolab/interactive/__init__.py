@@ -83,11 +83,12 @@ def render_menu(labels, selected, descs=None, avail_rows=None):
         left = n - end
         lines.append(pad + Color.dim(f"  {Symbol.ARROW_DOWN} {left} lagi") if left else "")
 
-    # deskripsi item terpilih (selalu 2 baris: kosong + teks)
+    # deskripsi item terpilih (1 baris kosong + teks, hanya jika ada deskripsi)
     desc = (descs[selected] if descs else "") or ""
     desc = _clip(desc, w - 4)
-    lines.append("")
-    lines.append(" " * max((w - len(desc)) // 2, 0) + Color.dim(desc) if desc else "")
+    if desc:
+        lines.append("")
+        lines.append(" " * max((w - len(desc)) // 2, 0) + Color.dim(desc))
     return lines
 
 
@@ -97,8 +98,6 @@ def menu_lines(menu, sel, depth):
     descs = [it[2] if len(it) > 2 else "" for it in menu.items]
     hints = HINTS_SUB if depth > 0 else HINTS_MAIN
 
-    # Total baris = header(logo+3) + 3 (kosong, judul, kosong) + menu + 2 (kosong, deskripsi)
-    #               + 1 (kosong) + 2 (garis + hint) = header + menu + 8
     want_menu = min(len(labels), 10)
     logo_rows = max(h - 11 - want_menu, 1)
     header = _render_header(HEADER_SUBTITLE, max_logo_rows=logo_rows).split("\n")
@@ -106,7 +105,7 @@ def menu_lines(menu, sel, depth):
     avail = max(h - len(header) - 8, 3)
     body = render_menu(labels, sel, descs, avail_rows=avail)
     w = term_width()
-    lines = header + ["", Color.dim(center_block(menu.title, w)), ""] + body + ["", render_footer(hints, w)]
+    lines = header + [Color.dim(center_block(menu.title, w))] + body + ["", render_footer(hints, w)]
     return lines[:h]
 
 
@@ -137,7 +136,7 @@ class Menu:
 
 
 def run_interactive_menu() -> None:
-    """Run the interactive menu loop."""
+    """Run the interactive menu loop with alternate screen buffer for clean entry/exit."""
     import sys
     import readchar
     from readchar import key as readchar_key
@@ -148,18 +147,21 @@ def run_interactive_menu() -> None:
         term_width, term_height, center_block,
     )
 
+    # Enter alternate screen buffer (clean entry, restores on exit)
+    sys.stdout.write("\033[?1049h")
+    sys.stdout.flush()
+    
     hide_cursor()
     try:
         selected = 0
         while True:
-            # Render header
             h = term_height()
             w = term_width()
             want_menu = min(len(MAIN_LABELS), 10)
             logo_rows = max(h - 11 - want_menu, 1)
             header = render_header(HEADER_SUBTITLE, max_logo_rows=logo_rows).split("\n")
 
-            avail = max(h - len(header) - 8, 3)
+            avail = max(h - len(header) - 6, 3)
             labels = MAIN_LABELS
             n = len(labels)
             label_w = min(max(len(l) for l in labels), max(w - 6, 8))
@@ -186,13 +188,13 @@ def run_interactive_menu() -> None:
                 left = n - end
                 body.append(pad + Color.dim(f"  {Symbol.ARROW_DOWN} {left} lagi") if left else "")
 
-            # description of selected item
+            # description of selected item (only if non-empty)
             desc = ""
-            body.append("")
             if desc:
+                body.append("")
                 body.append(" " * max((w - len(desc)) // 2, 0) + Color.dim(desc))
 
-            lines = header + ["", Color.dim(center_block("MENU UTAMA", w)), ""] + body + ["", render_footer(HINTS_MAIN, w)]
+            lines = header + [Color.dim(center_block("MENU UTAMA", w))] + body + ["", render_footer(HINTS_MAIN, w)]
             lines = lines[:h]
 
             output = "\033[2J\033[H"
@@ -223,12 +225,13 @@ def run_interactive_menu() -> None:
                 if action:
                     action()
             elif k.lower() == 'q':
-                print("\n  Terima kasih telah menggunakan CryptoLab CLI. Sampai jumpa!\n")
                 break
             elif k == '?':
-                # Show help using existing help system
                 pass
     finally:
+        # Exit alternate screen buffer (restore original terminal)
+        sys.stdout.write("\033[?1049l")
+        sys.stdout.flush()
         show_cursor()
 
 __all__ = [
