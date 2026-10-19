@@ -145,6 +145,10 @@ def rsa_load_public_key(pem_data: str) -> RSA.RsaKey:
         raise InvalidInputError(f"Gagal memuat public key: {e}")
 
 
+def _warn_pkcs1v15(operation: str) -> str:
+    """Return warning for PKCS1v15 padding."""
+    return f"PERINGATAN: RSA-PKCS1v15 {operation} rentan terhadap padding oracle attacks. Gunakan OAEP (encrypt) / PSS (sign) untuk keamanan."
+
 def rsa_encrypt(
     plaintext: Union[str, bytes],
     public_key_pem: str,
@@ -201,6 +205,10 @@ def rsa_encrypt(
         output = ciphertext.hex()
         is_hex = True
 
+    reasons = [f"Key size: {public_key.size_in_bits()} bit", f"Padding: {padding}", f"Output: {encoding.upper()}"]
+    if padding.upper() != "OAEP":
+        reasons.append("PERINGATAN: PKCS1v15 rentan terhadap padding oracle. Gunakan OAEP.")
+
     return RSAResult(
         operation="encrypt",
         algorithm=algo_name,
@@ -209,7 +217,7 @@ def rsa_encrypt(
         key_size=public_key.size_in_bits(),
         technical_success=True,
         status_message=f"Enkripsi {algo_name} berhasil.",
-        reasons=[f"Key size: {public_key.size_in_bits()} bit", f"Padding: {padding}", f"Output: {encoding.upper()}"],
+        reasons=reasons,
         is_hex=is_hex,
     )
 
@@ -273,6 +281,10 @@ def rsa_decrypt(
         output = plaintext.hex()
         is_utf8 = False
 
+    reasons = [f"Key size: {private_key.size_in_bits()} bit", f"Padding: {padding}", "UTF-8 valid" if is_utf8 else "Output hex"]
+    if padding.upper() != "OAEP":
+        reasons.append("PERINGATAN: PKCS1v15 rentan terhadap padding oracle. Gunakan OAEP.")
+
     return RSAResult(
         operation="decrypt",
         algorithm=algo_name,
@@ -281,7 +293,7 @@ def rsa_decrypt(
         key_size=private_key.size_in_bits(),
         technical_success=True,
         status_message=f"Dekripsi {algo_name} berhasil." + ("" if is_utf8 else " (Output bukan UTF-8, ditampilkan hex)"),
-        reasons=[f"Key size: {private_key.size_in_bits()} bit", f"Padding: {padding}", "UTF-8 valid" if is_utf8 else "Output hex"],
+        reasons=reasons,
         is_hex=not is_utf8,
     )
 
@@ -328,6 +340,10 @@ def rsa_sign(
         output = signature.hex()
         is_hex = True
 
+    reasons = [f"Key size: {private_key.size_in_bits()} bit", f"Hash: {hash_algo}", f"Padding: {padding}"]
+    if padding.upper() != "PSS":
+        reasons.append("PERINGATAN: PKCS1v15 signature rentan terhadap forgery. Gunakan PSS.")
+
     return RSAResult(
         operation="sign",
         algorithm=algo_name,
@@ -336,7 +352,7 @@ def rsa_sign(
         key_size=private_key.size_in_bits(),
         technical_success=True,
         status_message=f"Tanda tangan {algo_name} berhasil dibuat.",
-        reasons=[f"Key size: {private_key.size_in_bits()} bit", f"Hash: {hash_algo}", f"Padding: {padding}"],
+        reasons=reasons,
         is_hex=is_hex,
     )
 
@@ -386,6 +402,10 @@ def rsa_verify(
         valid = False
         status = "INVALID (Tanda tangan TIDAK SAH)"
 
+    reasons = ["Verifikasi berhasil" if valid else "Tanda tangan tidak cocok"]
+    if padding.upper() != "PSS":
+        reasons.append("PERINGATAN: PKCS1v15 signature rentan terhadap forgery. Gunakan PSS.")
+
     return RSAResult(
         operation="verify",
         algorithm=algo_name,
@@ -394,7 +414,7 @@ def rsa_verify(
         key_size=public_key.size_in_bits(),
         technical_success=True,
         status_message=status,
-        reasons=["Verifikasi berhasil" if valid else "Tanda tangan tidak cocok"],
+        reasons=reasons,
         is_hex=False,
     )
 

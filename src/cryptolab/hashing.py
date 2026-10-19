@@ -307,8 +307,8 @@ def pbkdf2_hash(
     if len(salt_bytes) < 8:
         raise InvalidInputError("Salt minimal 8 bytes.")
 
-    if iterations < 1000:
-        raise InvalidInputError("Iterations minimal 1000.")
+    if iterations < 100000:
+        raise InvalidInputError("Iterations minimal 100,000 (rekomendasi OWASP 2024).")
 
     hash_name = "sha256" if algo == "SHA256" else "sha512"
     derived = hashlib.pbkdf2_hmac(hash_name, pwd_bytes, salt_bytes, iterations, dklen=dklen)
@@ -367,6 +367,9 @@ def pbkdf2_verify(
     encoding: str = "hex",
 ) -> VerifyPasswordResult:
     """Verify a PBKDF2 password hash."""
+    if iterations < 100000:
+        raise InvalidInputError("Iterations minimal 100,000 (rekomendasi OWASP 2024).")
+    
     # Decode salt from hex/base64 if needed
     salt_bytes = _decode_salt(salt, encoding)
     

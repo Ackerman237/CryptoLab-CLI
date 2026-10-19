@@ -2,12 +2,55 @@
 
 import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 HISTORY_DIR_NAME = ".cryptolab_history"
 HISTORY_FILE_NAME = "history.jsonl"
+
+# Sensitive parameter keys that should never be logged
+SENSITIVE_PARAM_KEYS = {
+    "key", "iv", "password", "secret", "salt", "private_key", "privatekey",
+    "shared_secret", "sharedsecret", "passphrase", "pass", "pwd",
+    "decrypted", "plaintext", "ciphertext", "signature", "hmac",
+}
+
+# Keys that are safe to log
+SAFE_PARAM_KEYS = {
+    "mode", "padding", "algorithm", "encoding", "iterations", "rounds",
+    "dklen", "effective_keylen", "key_length", "shift", "rails",
+    "matrix_size", "score", "status", "match", "file", "filepath",
+    "operation", "encoding", "algo", "method", "category",
+}
+
+
+def _sanitize_params(params: Optional[Dict[str, Any]], include_secrets: bool = False) -> Dict[str, Any]:
+    """Remove sensitive parameters from history log.
+    
+    Args:
+        params: Dictionary of parameters
+        include_secrets: If True, keep sensitive params (for explicit opt-in)
+    
+    Returns:
+        Sanitized dictionary with only safe parameters
+    """
+    if not params:
+        return {}
+    
+    if include_secrets:
+        return params
+    
+    sanitized = {}
+    for key, value in params.items():
+        key_lower = key.lower()
+        # Keep if explicitly safe or not in sensitive list
+        if key_lower in SAFE_PARAM_KEYS or key_lower not in SENSITIVE_PARAM_KEYS:
+            sanitized[key] = value
+        else:
+            sanitized[key] = "[REDACTED]"
+    return sanitized
 
 
 def get_history_dir() -> Path:
@@ -29,6 +72,7 @@ def log_history(
     output_summary: str,
     params: Optional[Dict[str, Any]] = None,
     enabled: bool = True,
+    include_secrets: bool = False,
 ) -> bool:
     """Safely append an operation entry to the history file.
 
@@ -38,6 +82,7 @@ def log_history(
         output_summary: Summary or main result of the operation.
         params: Optional dictionary of parameters used (e.g. shift, depth).
         enabled: If False, skip logging (honors --no-history flag).
+        include_secrets: If True, log sensitive params (default False, requires explicit opt-in).
 
     Returns:
         True if successfully logged, False if disabled or write failed safely.
@@ -56,10 +101,13 @@ def log_history(
         else output_summary[:497] + "..."
     )
 
+    # Sanitize params to remove sensitive data
+    safe_params = _sanitize_params(params, include_secrets=include_secrets)
+
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "operation": operation,
-        "params": params or {},
+        "params": safe_params,
         "input": safe_input,
         "output": safe_output,
     }

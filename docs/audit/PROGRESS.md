@@ -18,11 +18,11 @@
 
 | Step | Task | Status | Verifikasi | Catatan |
 |------|------|--------|------------|---------|
-| A1 | Tambah warning MD5/SHA-1/ECB/RC2 di UI | `[ ]` | Manual test | |
-| A2 | Fix `hmac_verify` & `hash_verify_integrity` pakai `hmac.compare_digest` | `[ ]` | Unit test | `hashing.py:280` |
-| A3 | Enforce minimum PBKDF2 iter (100k) & Bcrypt cost range (4-31) | `[ ]` | Test edge cases | `hashing.py:340,380` |
-| A4 | Hapus/guard key/IV dari history log | `[ ]` | Test history | `utils/history.py:45` |
-| A5 | Deprecation warning RSA PKCS#1 v1.5 | `[ ]` | Test CLI & interactive | `asymmetric.py` |
+| A1 | Tambah warning MD5/SHA-1/ECB/RC2 di UI | `[x]` | Manual test | CLI & Interactive tested |
+| A2 | Fix `hmac_verify` & `hash_verify_integrity` pakai `hmac.compare_digest` | `[x]` | Already implemented | All verify functions use constant-time compare |
+| A3 | Enforce minimum PBKDF2 iter (100k) & Bcrypt cost range (4-31) | `[x]` | Test edge cases | PBKDF2 min 100k, Bcrypt 4-31 enforced |
+| A4 | Hapus/guard key/IV dari history log | `[x]` | Test history | Sanitization with `[REDACTED]` |
+| A5 | Deprecation warning RSA PKCS#1 v1.5 | `[x]` | Test CLI & interactive | Warning in reasons for encrypt/decrypt/sign/verify |
 
 ---
 

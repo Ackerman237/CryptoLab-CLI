@@ -11,12 +11,12 @@ from typing import Optional
 LOGO_LARGE = """\
 ▄▀▀▀▀ █▀▀▀▄ █   █ █▀▀▀▄ ▀▀█▀▀ ▄▀▀▀▄ █     ▄▀▀▀▄ █▀▀▀▄
 █     █▀▀█   ▀▄▀  █▀▀▀    █   █   █ █     █▀▀▀█ █▀▀▀▄
- ▀▀▀▀ ▀   ▀   ▀   ▀       ▀    ▀▀▀  ▀▀▀▀▀ ▀   ▀ ▀▀▀▀"""
+▀▀▀▀ ▀   ▀   ▀   ▀       ▀    ▀▀▀  ▀▀▀▀▀ ▀   ▀ ▀▀▀▀"""
 
 LOGO_MEDIUM = """\
 ▄▀▀▀▀ █▀▀▀▄ █   █ █▀▀▀▄
 █     █▀▀█   ▀▄▀  █▀▀▀
- ▀▀▀▀ ▀   ▀   ▀   ▀"""
+▀▀▀▀ ▀   ▀   ▀   ▀"""
 
 LOGO_TINY = "CRYPTOLAB"
 
@@ -55,8 +55,8 @@ def _block_width(text: str) -> int:
     return max(len(line) for line in text.splitlines())
 
 
-def center_block(text: str, width: int) -> str:
-    """Center a multi-line block within width."""
+def center_block(text: str, width: int, offset: int = 0) -> str:
+    """Center a multi-line block within width, with optional offset."""
     lines = text.splitlines()
     return "\n".join(line.center(width) for line in lines)
 
@@ -109,10 +109,46 @@ def _clip(text: str, width: int) -> str:
 
 
 # ============================================================
+# Security Warnings
+# ============================================================
+YELLOW = "\033[33m"
+
+def warn_weak_hash(algorithm: str) -> str:
+    """Return warning message for weak hash algorithms."""
+    warnings = {
+        "MD5": "PERINGATAN: MD5 adalah hash lemah (collision attacks praktis). JANGAN gunakan untuk keamanan.",
+        "SHA1": "PERINGATAN: SHA-1 adalah hash lemah (collision attacks praktis). JANGAN gunakan untuk keamanan.",
+    }
+    return warnings.get(algorithm.upper(), "")
+
+
+def warn_ecb_mode() -> str:
+    """Return warning for ECB mode."""
+    return "PERINGATAN: Mode ECB tidak aman untuk data >1 blok (pola plaintext terlihat). Gunakan CBC/GCM."
+
+
+def warn_rc2() -> str:
+    """Return warning for RC2 cipher."""
+    return "PERINGATAN: RC2/ARC2 adalah cipher legacy (deprecated 2015). Gunakan AES untuk sistem baru."
+
+
+def warn_rsa_pkcs1v15() -> str:
+    """Return warning for RSA PKCS#1 v1.5."""
+    return "PERINGATAN: PKCS#1 v1.5 rentan terhadap padding oracle. Gunakan OAEP (encrypt) / PSS (sign)."
+
+
+def print_warning(message: str) -> None:
+    """Print a formatted warning message."""
+    if message:
+        sys.stdout.write(f"{YELLOW}{message}{RESET}\n")
+        sys.stdout.flush()
+
+
+# ============================================================
 # Hints
 # ============================================================
-HINTS_MAIN = [("^v", "navigasi"), ("enter", "pilih"), ("q", "keluar"), ("?", "bantuan")]
-HINTS_SUB = [("^v", "navigasi"), ("enter", "pilih"), ("esc", "kembali"), ("q", "keluar"), ("?", "bantuan")]
+HINTS_MAIN = [("↑↓", "navigasi"), ("enter", "pilih"), ("q", "keluar"), ("?", "bantuan")]
+HINTS_SUB = [("↑↓", "navigasi"), ("enter", "pilih"), ("esc", "kembali"), ("q", "keluar"), ("?", "bantuan")]
 
 # ============================================================
 # Terminal control
