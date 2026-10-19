@@ -58,7 +58,7 @@
 
 | Step | Task | Status | Verifikasi | Catatan |
 |------|------|--------|------------|---------|
-| C1 | Pecah `cli.py` → `cli/commands/` + `cli/formatters/` | `[ ]` | All CLI tests pass | 1,677 lines → package |
+| C1 | Pecah `cli.py` → `cli/commands/` + `cli/formatters/` | `[x]` | All CLI tests pass | 1,677 lines → package |
 | C2 | Pecah `interactive.py` → `interactive/handlers/` + `interactive/menu.py` | `[ ]` | All interactive tests pass | 3,281 lines → package |
 | C3 | Ekstrak `core/` package dari module existing | `[ ]` | Import paths updated | Move classical, symmetric, etc |
 | C4 | Hapus dead code (LOGO_*, _PIXEL_FONT, fix_*.py) | `[ ]` | No import errors | Cleanup |
@@ -80,7 +80,7 @@
 
 | # | Task | Status | Catatan |
 |---|------|--------|---------|
-| Q1 | Hapus 30+ file `fix_*.py` di root | `[ ]` | `rm fix_*.py` |
+| Q1 | Hapus 30+ file `fix_*.py` di root | `[x]` | Moved to `legacy/fix_attempts/` |
 | Q2 | Hapus dead code LOGO_LARGE, _PIXEL_FONT di interactive.py | `[ ]` | ~50 lines |
 | Q3 | Consolidate DIVIDER/THIN_DIVIDER ke theme | `[ ]` | 4 definitions → 1 |
 | Q4 | Tambah warning MD5/SHA-1 di hashing.py | `[ ]` | Part of A1 |
