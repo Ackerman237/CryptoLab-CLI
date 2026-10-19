@@ -59,7 +59,7 @@
 | Step | Task | Status | Verifikasi | Catatan |
 |------|------|--------|------------|---------|
 | C1 | Pecah `cli.py` → `cli/commands/` + `cli/formatters/` | `[x]` | All CLI tests pass | 1,677 lines → package |
-| C2 | Pecah `interactive.py` → `interactive/handlers/` + `interactive/menu.py` | `[ ]` | All interactive tests pass | 3,281 lines → package |
+| C2 | Pecah `interactive.py` → `interactive/handlers/` + `interactive/menu.py` | `[x]` | All interactive tests pass | 3,281 lines → package |
 | C3 | Ekstrak `core/` package dari module existing | `[ ]` | Import paths updated | Move classical, symmetric, etc |
 | C4 | Hapus dead code (LOGO_*, _PIXEL_FONT, fix_*.py) | `[ ]` | No import errors | Cleanup |
 
