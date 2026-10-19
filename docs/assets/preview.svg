@@ -1,0 +1,38 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="CryptoLab terminal preview">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" x2="1">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="100%" stop-color="#d1d5db"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" rx="18" fill="url(#bg)"/>
+  <rect x="18" y="18" width="924" height="504" rx="14" fill="#0b1220" stroke="#30363d"/>
+  <rect x="18" y="18" width="924" height="40" rx="14" fill="#111827"/>
+  <circle cx="48" cy="38" r="7" fill="#f85149"/>
+  <circle cx="74" cy="38" r="7" fill="#fbbf24"/>
+  <circle cx="100" cy="38" r="7" fill="#34d399"/>
+  <text x="150" y="46" font-family="Consolas, monospace" font-size="19" fill="#d1d5db">CRYPTOLAB</text>
+  <text x="52" y="110" font-family="Consolas, monospace" font-size="30" fill="#f0f6fc">▄▀▀▀▀ █▀▀▀▄ █   █ █▀▀▀▄</text>
+  <text x="52" y="150" font-family="Consolas, monospace" font-size="30" fill="#f0f6fc">█     █▀▀█   ▀▄▀  █▀▀▀</text>
+  <text x="52" y="190" font-family="Consolas, monospace" font-size="30" fill="#f0f6fc">▀▀▀▀ ▀   ▀   ▀   ▀</text>
+  <text x="52" y="235" font-family="Consolas, monospace" font-size="19" fill="#9ca3af">Toolkit kriptografi &amp; encoding interaktif</text>
+  <line x1="52" y1="270" x2="905" y2="270" stroke="url(#line)" stroke-width="2" opacity="0.8"/>
+  <text x="52" y="320" font-family="Consolas, monospace" font-size="18" fill="#7dd3fc">[1]</text>
+  <text x="90" y="320" font-family="Consolas, monospace" font-size="18" fill="#f0f6fc">Auto Analyze</text>
+  <text x="52" y="355" font-family="Consolas, monospace" font-size="18" fill="#7dd3fc">[2]</text>
+  <text x="90" y="355" font-family="Consolas, monospace" font-size="18" fill="#f0f6fc">Classical Ciphers</text>
+  <text x="52" y="390" font-family="Consolas, monospace" font-size="18" fill="#7dd3fc">[3]</text>
+  <text x="90" y="390" font-family="Consolas, monospace" font-size="18" fill="#f0f6fc">Symmetric Ciphers</text>
+  <text x="52" y="425" font-family="Consolas, monospace" font-size="18" fill="#7dd3fc">[4]</text>
+  <text x="90" y="425" font-family="Consolas, monospace" font-size="18" fill="#f0f6fc">Hashing &amp; MAC</text>
+  <text x="520" y="320" font-family="Consolas, monospace" font-size="18" fill="#34d399">Pilih menu [1-8]:</text>
+  <text x="520" y="355" font-family="Consolas, monospace" font-size="18" fill="#d1d5db">1</text>
+  <text x="520" y="390" font-family="Consolas, monospace" font-size="18" fill="#d1d5db">AES CBC</text>
+  <text x="520" y="425" font-family="Consolas, monospace" font-size="18" fill="#d1d5db">SHA256</text>
+  <line x1="52" y1="455" x2="905" y2="455" stroke="#30363d" stroke-width="2"/>
+  <text x="52" y="488" font-family="Consolas, monospace" font-size="17" fill="#9ca3af">↑↓ navigasi  •  Enter pilih  •  Esc kembali  •  q keluar</text>
+</svg>
