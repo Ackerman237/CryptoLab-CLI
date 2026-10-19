@@ -42,14 +42,34 @@
 
 ## Quick Start
 
+### Windows PowerShell
+
 ```bash
 git clone https://github.com/Ackerman237/CryptoLab-CLI.git
 cd CryptoLab-CLI
 python -m venv .venv
-# Windows PowerShell
 .\.venv\Scripts\Activate.ps1
-# Linux/macOS
-# source .venv/bin/activate
+pip install -e .
+cryptolab
+```
+
+Jika perintah `cryptolab` belum dikenali setelah instalasi user-level, tambahkan folder
+Scripts ke PATH dengan satu baris PowerShell berikut:
+
+```powershell
+$userPath=[Environment]::GetEnvironmentVariable("Path","User");$newPath="$env:APPDATA\Python\Python312\Scripts";if (($userPath -split ';') -notcontains $newPath) {[Environment]::SetEnvironmentVariable("Path","$userPath;$newPath","User")}
+```
+
+Tutup dan buka kembali PowerShell setelah mengubah PATH. Untuk Python versi lain,
+sesuaikan `Python312` dengan folder versi Python yang digunakan.
+
+### Linux/macOS
+
+```bash
+git clone https://github.com/Ackerman237/CryptoLab-CLI.git
+cd CryptoLab-CLI
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
 cryptolab
 ```
