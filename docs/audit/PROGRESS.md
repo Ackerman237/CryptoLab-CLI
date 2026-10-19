@@ -41,13 +41,13 @@
 
 | Step | Task | Status | Verifikasi | Catatan |
 |------|------|--------|------------|---------|
-| B1 | Ekstrak `ui/theme.py` (colors, symbols, tokens) | `[ ]` | Snapshot test theme | New package |
-| B2 | Widget `Rule` (ganti divider) | `[ ]` | Snapshot width 40/60/80/120 | Replace 52 occurences |
-| B3 | Widget `Message` (error/success/warning/info) | `[ ]` | Snapshot test | Replace 45 ANSI raw |
-| B4 | Widget `Prompt` (ask/choose/confirm) | `[ ]` | Manual test input flow | Replace safe_input |
-| B5 | Widget `KeyValue` & `Table` | `[ ]` | Snapshot test | |
-| B6 | Widget `Panel` (ganti render_box, render_card) | `[ ]` | Snapshot test | Replace 2 systems |
-| B7 | Widget `Menu` & `Navigation` | `[ ]` | Snapshot test | Core UX |
+| B1 | Ekstrak `ui/theme.py` (colors, symbols, tokens) | `[x]` | `pytest tests/ -k "snapshot"` | New package `src/cryptolab/ui/` |
+| B2 | Widget `Rule` (ganti divider) | `[x]` | Snapshot width 40/60/80/120 | Replace 52 occurences |
+| B3 | Widget `Message` (error/success/warning/info) | `[x]` | Snapshot test | Replace 45 ANSI raw |
+| B4 | Widget `Prompt` (ask/choose/confirm) | `[x]` | Manual test input flow | Replace safe_input |
+| B5 | Widget `KeyValue` & `Table` | `[x]` | Snapshot test | |
+| B6 | Widget `Panel` (ganti render_box, render_card) | `[x]` | Snapshot test | Replace 2 systems |
+| B7 | Widget `Menu` & `Navigation` | `[x]` | Snapshot test | Core UX |
 | B8 | Widget `Header`/`Footer`/`Page` | `[ ]` | Snapshot test | Layout structure |
 | B9 | Widget `Task` (spinner/progress/steps) | `[ ]` | Manual test | Progress feedback |
 | B10 | Test penjaga: grep larangan pola lama | `[ ]` | CI fail kalau ditemukan | `tests/test_ui_guard.py` |
