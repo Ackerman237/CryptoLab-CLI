@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Union
 from contextlib import contextmanager
 
-from cryptolab.banner import (
+from cryptolab.ui import (
     paint, DIM, BOLD, WHITE, GREEN, RED, CYAN, term_width, term_height,
     hide_cursor, show_cursor, clear_screen, clear_from_cursor,
     render_footer, render_header, _clip

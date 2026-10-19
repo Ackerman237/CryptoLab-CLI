@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from cryptolab.interactive import (
+from cryptolab import (
     run_interactive_menu,
     handle_auto_analyze,
     handle_caesar,
@@ -14,7 +14,7 @@ from cryptolab.interactive import (
     handle_history,
     save_result_prompt,
 )
-from cryptolab.utils.history import clear_history, read_history
+from cryptolab import clear_history, read_history
 
 
 class TestInteractive:

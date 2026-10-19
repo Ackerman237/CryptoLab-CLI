@@ -5,19 +5,19 @@ operations work correctly and maintain identity (plaintext in = plaintext out).
 """
 
 import pytest
-from cryptolab.classical.caesar import caesar_encrypt, caesar_decrypt
-from cryptolab.classical.vigenere import vigenere_encrypt, vigenere_decrypt
-from cryptolab.classical.playfair import playfair_encrypt, playfair_decrypt
-from cryptolab.classical.hill import hill_encrypt, hill_decrypt
-from cryptolab.classical.affine import affine_encrypt, affine_decrypt, VALID_A_VALUES
-from cryptolab.classical.railfence import railfence_encrypt, railfence_decrypt
-from cryptolab.encoding.base64_codec import base64_encode, base64_decode
-from cryptolab.encoding.hex_codec import hex_encode, hex_decode
-from cryptolab.encoding.binary_codec import binary_encode, binary_decode
-from cryptolab.symmetric.des import des_encrypt, des_decrypt
-from cryptolab.symmetric.aes import aes_encrypt, aes_decrypt
-from cryptolab.symmetric.rc2 import rc2_encrypt, rc2_decrypt
-from cryptolab.hashing import (
+from cryptolab import caesar_encrypt, caesar_decrypt
+from cryptolab import vigenere_encrypt, vigenere_decrypt
+from cryptolab import playfair_encrypt, playfair_decrypt
+from cryptolab import hill_encrypt, hill_decrypt
+from cryptolab import affine_encrypt, affine_decrypt, VALID_A_VALUES
+from cryptolab import railfence_encrypt, railfence_decrypt
+from cryptolab import base64_encode, base64_decode
+from cryptolab import hex_encode, hex_decode
+from cryptolab import binary_encode, binary_decode
+from cryptolab import des_encrypt, des_decrypt
+from cryptolab import aes_encrypt, aes_decrypt
+from cryptolab import rc2_encrypt, rc2_decrypt
+from cryptolab import (
     hash_compute,
     hash_verify_integrity,
     hmac_compute,
@@ -29,7 +29,7 @@ from cryptolab.hashing import (
     hash_verify_integrity,
     BCRYPT_AVAILABLE,
 )
-from cryptolab.asymmetric import (
+from cryptolab import (
     rsa_generate_keypair,
     rsa_encrypt,
     rsa_decrypt,

@@ -3,7 +3,7 @@
 import argparse
 from typing import List
 
-from cryptolab.hashing import BCRYPT_AVAILABLE
+from cryptolab.core.hashing import BCRYPT_AVAILABLE
 
 
 def create_parser() -> argparse.ArgumentParser:

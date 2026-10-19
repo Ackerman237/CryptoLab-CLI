@@ -11,6 +11,8 @@ from cryptolab.ui.theme import (
     center_block,
     clip_text,
     fit_hints,
+    render_footer,
+    render_header,
     HINTS_MAIN,
     HINTS_SUB,
 )
@@ -57,6 +59,8 @@ __all__ = [
     "center_block",
     "clip_text",
     "fit_hints",
+    "render_footer",
+    "render_header",
     "HINTS_MAIN",
     "HINTS_SUB",
     # Layout

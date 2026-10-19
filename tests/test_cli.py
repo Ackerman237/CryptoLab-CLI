@@ -1,6 +1,6 @@
 """Unit tests for CLI parser, argument dispatching, and rendering."""
 
-from cryptolab.cli import create_parser, handle_cli_args, render_box, render_error
+from cryptolab import create_parser, handle_cli_args, render_box, render_error
 
 
 class TestCLI:

@@ -47,7 +47,8 @@ class TestInteractiveRendering:
         lines = render_menu(labels, selected=0, descs=descs, avail_rows=10)
 
         # Should have header (scroll indicators if needed) + options + blank + description
-        assert any("▸ Option 1" in line for line in lines)
+        # Using ASCII fallback on Windows: > instead of ▸
+        assert any("> Option 1" in line or "▸ Option 1" in line for line in lines)
         assert any("  Option 2" in line for line in lines)
         assert any("  Option 3" in line for line in lines)
         assert any("Desc 1" in line for line in lines)
@@ -58,8 +59,11 @@ class TestInteractiveRendering:
         descs = ["Desc 1", "Desc 2", "Desc 3"]
         lines = render_menu(labels, selected=1, descs=descs, avail_rows=10)
 
+        # Selected item should have pointer
+        assert any("> Option 2" in line or "▸ Option 2" in line for line in lines)
+
         assert any("  Option 1" in line for line in lines)
-        assert any("▸ Option 2" in line for line in lines)
+        assert any("> Option 2" in line or "▸ Option 2" in line for line in lines)
         assert any("Desc 2" in line for line in lines)
 
     def test_render_menu_scroll_up(self):
@@ -68,8 +72,8 @@ class TestInteractiveRendering:
         descs = [f"Desc {i}" for i in range(15)]
         lines = render_menu(labels, selected=0, descs=descs, avail_rows=8)
 
-        # Should show scroll indicator
-        assert any("↓" in line for line in lines)
+        # Should show scroll indicator (ASCII fallback: v, Unicode: ↓)
+        assert any("v" in line or "↓" in line for line in lines)
 
     def test_render_menu_scroll_down(self):
         """Test menu scrolling down indicator."""
@@ -78,7 +82,7 @@ class TestInteractiveRendering:
         lines = render_menu(labels, selected=14, descs=descs, avail_rows=8)
 
         # Should show scroll indicator
-        assert any("↑" in line for line in lines)
+        assert any("^" in line or "↑" in line for line in lines)
 
     def test_render_menu_truncation(self):
         """Test long label truncation."""
@@ -88,7 +92,7 @@ class TestInteractiveRendering:
 
         # Label should be truncated
         for line in lines:
-            if "A" in line and "▸" in line:
+            if "A" in line and (">" in line or "▸" in line):
                 assert len(line) < 200  # Should not have full 100 chars
 
     def test_menu_lines_structure(self):
@@ -123,7 +127,7 @@ class TestInteractiveRendering:
         """Test _clip text truncation."""
         assert _clip("short", 10) == "short"
         result = _clip("this is a very long text", 10)
-        assert result.startswith("this is a") and result.endswith("…")
+        assert result.startswith("this is a") and (result.endswith("…") or result.endswith("..."))
         assert _clip("exact", 5) == "exact"
         assert _clip("", 10) == ""
 
@@ -132,7 +136,7 @@ class TestInteractiveRendering:
         long_subtitle = "A" * 200
         output = render_header(long_subtitle, max_logo_rows=10)
         # Should truncate at terminal width
-        assert "…" in output or len(output) < 500
+        assert "…" in output or "..." in output or len(output) < 500
 
 
 class TestInteractiveMenuNavigation:
@@ -190,14 +194,15 @@ class TestFooterHints:
 
     def test_hints_main(self):
         """Test main menu hints."""
-        assert ("↑↓", "navigasi") in HINTS_MAIN
+        # Unicode: ↑↓, ASCII fallback: ^v
+        assert ("↑↓", "navigasi") in HINTS_MAIN or ("^v", "navigasi") in HINTS_MAIN
         assert ("enter", "pilih") in HINTS_MAIN
         assert ("q", "keluar") in HINTS_MAIN
         assert ("?", "bantuan") in HINTS_MAIN
 
     def test_hints_sub(self):
         """Test sub menu hints."""
-        assert ("↑↓", "navigasi") in HINTS_SUB
+        assert ("↑↓", "navigasi") in HINTS_SUB or ("^v", "navigasi") in HINTS_SUB
         assert ("enter", "pilih") in HINTS_SUB
         assert ("esc", "kembali") in HINTS_SUB
         assert ("q", "keluar") in HINTS_SUB

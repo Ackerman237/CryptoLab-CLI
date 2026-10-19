@@ -239,7 +239,7 @@ class TestCLISnapshots:
     def test_rsa_encrypt(self):
         """Test RSA encrypt output structure (uses fixed test keypair for deterministic output)."""
         # Use a fixed test keypair for deterministic output
-        from cryptolab.asymmetric import rsa_generate_keypair
+        from cryptolab import rsa_generate_keypair
         import re
         # Generate keypair programmatically to avoid CLI overhead
         keypair = rsa_generate_keypair(2048)

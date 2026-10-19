@@ -1,8 +1,8 @@
 """Unit tests for Caesar Cipher."""
 
 import pytest
-from cryptolab.classical.caesar import caesar_encrypt, caesar_decrypt
-from cryptolab.exceptions import InvalidInputError
+from cryptolab import caesar_encrypt, caesar_decrypt
+from cryptolab import InvalidInputError
 
 
 class TestCaesarCipher:

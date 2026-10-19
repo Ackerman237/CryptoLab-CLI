@@ -1,6 +1,7 @@
 """Panel widget - replaces render_box (CLI) and render_card (interactive)."""
 
 from typing import Dict, List, Optional
+from cryptolab import __version__
 from cryptolab.ui.theme import Color, Symbol, Spacing, Width, clip_text, term_width
 from cryptolab.ui.widgets.rule import Rule
 
@@ -68,30 +69,35 @@ class Panel:
         params: Optional[Dict[str, str]] = None,
         width: int = Width.DIVIDER_CLI,
     ) -> str:
-        """Render CLI-style box (replaces render_box)."""
+        """Render CLI-style box (replaces render_box) - EXACT match to old render_box."""
         lines = [
             Rule.heavy(width),
-            f"  CRYPTOLAB CLI - {title.upper()}",
+            f"  CRYPTOLAB CLI v{__version__} - {title.upper()}",
             Rule.heavy(width),
-            f"  {operation}",
-            Rule.light(width),
-            f"  Input:  {clip_text(input_text, width - 12)}",
-            f"  Output: {clip_text(output_text, width - 12)}",
+            f"  Operasi     : {operation}",
         ]
         if params:
             for k, v in params.items():
-                lines.append(f"  {k}: {v}")
-        lines.append(Rule.heavy(width))
+                lines.append(f"  {k:<12}: {v}")
+
+        lines.extend([
+            f"  Status      : BERHASIL (OK)",
+            Rule.light(width),
+            "  INPUT:",
+            f"  {input_text}",
+            Rule.light(width),
+            "  OUTPUT:",
+            f"  {output_text}",
+            Rule.heavy(width),
+        ])
         return "\n".join(lines)
 
     @staticmethod
     def error(message: str, width: int = Width.DIVIDER_CLI) -> str:
-        """Render error box (replaces render_error)."""
+        """Render error box (replaces render_error) - EXACT match to old render_error."""
         lines = [
             Rule.heavy(width),
-            f"  CRYPTOLAB CLI - ERROR",
-            Rule.heavy(width),
-            f"  {message}",
+            f"  CRYPTOLAB CLI - ERROR: {message}",
             Rule.heavy(width),
         ]
         return "\n".join(lines)

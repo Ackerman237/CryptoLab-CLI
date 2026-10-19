@@ -1,7 +1,7 @@
 """Unit tests for Asymmetric Cryptography module."""
 
 import pytest
-from cryptolab.asymmetric import (
+from cryptolab import (
     rsa_generate_keypair,
     rsa_load_private_key,
     rsa_load_public_key,
@@ -16,7 +16,7 @@ from cryptolab.asymmetric import (
     RSAResult,
     DHKeyExchangeResult,
 )
-from cryptolab.exceptions import InvalidInputError, DecodingError
+from cryptolab import InvalidInputError, DecodingError
 
 
 class TestRSAKeyGeneration:
@@ -266,7 +266,7 @@ class TestDHIntegration:
         # Derive AES key from shared secret
         aes_key = dh_derive_key(dh_result.shared_secret_hex, key_length=16, hash_algo="SHA256")
         # Use AES key to encrypt
-        from cryptolab.symmetric.aes import aes_encrypt, aes_decrypt
+        from cryptolab import aes_encrypt, aes_decrypt
         plaintext = "Secret message from DHKE"
         enc = aes_encrypt(plaintext, key=aes_key, mode="CBC", iv="0" * 16, padding="PKCS7")
         dec = aes_decrypt(enc.output_text, key=aes_key, mode="CBC", iv="0" * 16, padding="PKCS7")

@@ -3,16 +3,16 @@
 import sys
 from argparse import Namespace
 
-from cryptolab.classical.caesar import caesar_encrypt, caesar_decrypt
-from cryptolab.classical.vigenere import vigenere_encrypt, vigenere_decrypt
-from cryptolab.classical.playfair import playfair_encrypt, playfair_decrypt
-from cryptolab.classical.hill import hill_encrypt, hill_decrypt
-from cryptolab.classical.affine import affine_encrypt, affine_decrypt, affine_brute_force, VALID_A_VALUES
-from cryptolab.classical.railfence import railfence_encrypt, railfence_decrypt, railfence_brute_force
+from cryptolab import caesar_encrypt, caesar_decrypt
+from cryptolab import vigenere_encrypt, vigenere_decrypt
+from cryptolab import playfair_encrypt, playfair_decrypt
+from cryptolab import hill_encrypt, hill_decrypt
+from cryptolab import affine_encrypt, affine_decrypt, affine_brute_force, VALID_A_VALUES
+from cryptolab import railfence_encrypt, railfence_decrypt, railfence_brute_force
 
-from cryptolab.analysis.brute_force import caesar_brute_force, find_best_candidate
-from cryptolab.exceptions import InvalidInputError
-from cryptolab.utils.history import log_history
+from cryptolab import caesar_brute_force, find_best_candidate
+from cryptolab import InvalidInputError
+from cryptolab import log_history
 from cryptolab.cli.formatters import (
     render_box,
     render_error,

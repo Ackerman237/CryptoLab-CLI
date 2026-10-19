@@ -10,8 +10,8 @@ def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
 
-    # If no command provided, show help and enter interactive menu
-    if args.command is None or args.command == "menu":
+    # If no command provided (None, empty string, or "menu"), enter interactive menu
+    if not args.command or args.command == "menu":
         run_interactive_menu()
         return 0
 

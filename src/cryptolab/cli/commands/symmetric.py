@@ -3,13 +3,9 @@
 import sys
 from argparse import Namespace
 
-from cryptolab.symmetric.des import des_encrypt, des_decrypt, des_auto_analyze
-from cryptolab.symmetric.aes import aes_encrypt, aes_decrypt, aes_auto_analyze
-from cryptolab.symmetric.rc2 import rc2_encrypt, rc2_decrypt, rc2_auto_analyze
+from cryptolab import des_encrypt, des_decrypt, des_auto_analyze, aes_encrypt, aes_decrypt, aes_auto_analyze, rc2_encrypt, rc2_decrypt, rc2_auto_analyze
 from cryptolab.banner import warn_ecb_mode, warn_rc2, print_warning
-
-from cryptolab.exceptions import InvalidInputError
-from cryptolab.utils.history import log_history
+from cryptolab import InvalidInputError, log_history
 from cryptolab.cli.formatters import render_box, render_error
 
 

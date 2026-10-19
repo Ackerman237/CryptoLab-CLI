@@ -10,7 +10,7 @@ import tempfile
 import os
 from pathlib import Path
 
-from cryptolab.utils.history import (
+from cryptolab import (
     log_history,
     read_history,
     clear_history,
@@ -250,8 +250,8 @@ class TestHistorySecurityIntegration:
 
     def test_des_encrypt_history_no_key(self):
         """DES encrypt history should not contain key."""
-        from cryptolab.symmetric.des import des_encrypt
-        from cryptolab.utils.history import log_history, read_history, clear_history
+        from cryptolab import des_encrypt
+        from cryptolab import log_history, read_history, clear_history
 
         clear_history()
         plaintext = "Hello World"
@@ -272,8 +272,8 @@ class TestHistorySecurityIntegration:
 
     def test_aes_encrypt_history_no_key(self):
         """AES encrypt history should not contain key."""
-        from cryptolab.symmetric.aes import aes_encrypt
-        from cryptolab.utils.history import log_history, read_history, clear_history
+        from cryptolab import aes_encrypt
+        from cryptolab import log_history, read_history, clear_history
 
         clear_history()
         plaintext = "Hello World"
@@ -293,8 +293,8 @@ class TestHistorySecurityIntegration:
 
     def test_rsa_encrypt_history_no_private_key(self):
         """RSA encrypt history should not contain private key."""
-        from cryptolab.asymmetric import rsa_generate_keypair, rsa_encrypt
-        from cryptolab.utils.history import log_history, read_history, clear_history
+        from cryptolab import rsa_generate_keypair, rsa_encrypt
+        from cryptolab import log_history, read_history, clear_history
 
         clear_history()
         keypair = rsa_generate_keypair(2048)
@@ -313,8 +313,8 @@ class TestHistorySecurityIntegration:
 
     def test_pbkdf2_history_no_password(self):
         """PBKDF2 history should not contain password."""
-        from cryptolab.hashing import pbkdf2_hash
-        from cryptolab.utils.history import log_history, read_history, clear_history
+        from cryptolab import pbkdf2_hash
+        from cryptolab import log_history, read_history, clear_history
 
         clear_history()
         password = "my_secure_password"

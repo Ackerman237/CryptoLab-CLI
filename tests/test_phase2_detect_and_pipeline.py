@@ -1,11 +1,11 @@
 """Unit tests for Phase 2 format detection, auto-decode pipeline, and edge cases."""
 
 import pytest
-from cryptolab.analysis.detect import detect_format
-from cryptolab.analysis.pipeline import run_decode_pipeline
-from cryptolab.encoding.base64_codec import base64_encode
-from cryptolab.encoding.hex_codec import hex_encode
-from cryptolab.encoding.binary_codec import binary_encode
+from cryptolab import detect_format
+from cryptolab import run_decode_pipeline
+from cryptolab import base64_encode
+from cryptolab import hex_encode
+from cryptolab import binary_encode
 
 
 class TestDetectAndPipelinePhase2:

@@ -1,19 +1,19 @@
-"""Analysis module: format detection, brute force, multi-stage pipeline, and scoring."""
+"""Analysis module: format detection, brute force, multi-stage pipeline, and scoring. Backward compatibility."""
 
-from cryptolab.analysis.detect import detect_format, DetectionResult
-from cryptolab.analysis.brute_force import (
+from cryptolab.core.analysis import (
+    detect_format,
+    DetectionResult,
     caesar_brute_force,
     CaesarCandidate,
     find_best_candidate,
-)
-from cryptolab.analysis.auto_decode import auto_decode, AutoDecodeResult, DecodeStep
-from cryptolab.analysis.scoring import calculate_text_score, ScoreResult
-from cryptolab.analysis.pipeline import (
+    auto_decode,
+    AutoDecodeResult,
+    DecodeStep,
+    calculate_text_score,
+    ScoreResult,
     run_decode_pipeline,
     PipelineResult,
     DecodeBranch,
-)
-from cryptolab.analysis.auto_engine import (
     run_auto_analysis,
     AutoCandidate,
     AutoAnalysisReport,
@@ -37,4 +37,3 @@ __all__ = [
     "AutoCandidate",
     "AutoAnalysisReport",
 ]
-

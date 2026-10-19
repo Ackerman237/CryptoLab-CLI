@@ -1,7 +1,7 @@
 """Unit tests for Hashing module."""
 
 import pytest
-from cryptolab.hashing import (
+from cryptolab import (
     hash_compute,
     hash_file,
     hmac_compute,
@@ -18,7 +18,7 @@ from cryptolab.hashing import (
     SUPPORTED_PBKDF2_ALGOS,
     SUPPORTED_PASSWORD_ALGOS,
 )
-from cryptolab.exceptions import InvalidInputError, DecodingError
+from cryptolab import InvalidInputError, DecodingError
 import tempfile
 import os
 import base64

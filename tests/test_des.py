@@ -1,20 +1,20 @@
 """Unit tests for DES (Data Encryption Standard) CBC and ECB modes, padding, and CLI."""
 
 import pytest
-from cryptolab.exceptions import (
+from cryptolab import (
     CryptoLabError,
     DecodingError,
     InvalidInputError,
     InvalidKeyError,
 )
-from cryptolab.symmetric.des import (
+from cryptolab import (
     des_encrypt,
     des_decrypt,
     des_auto_analyze,
     DesResult,
 )
-from cryptolab.cli import create_parser, handle_cli_args
-from cryptolab.utils.history import clear_history
+from cryptolab import create_parser, handle_cli_args
+from cryptolab import clear_history
 
 
 class TestDES:

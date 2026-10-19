@@ -1,10 +1,10 @@
 """Unit tests for Base64, Hexadecimal, and Binary codecs."""
 
 import pytest
-from cryptolab.encoding.base64_codec import base64_encode, base64_decode
-from cryptolab.encoding.hex_codec import hex_encode, hex_decode
-from cryptolab.encoding.binary_codec import binary_encode, binary_decode
-from cryptolab.exceptions import InvalidInputError, DecodingError
+from cryptolab import base64_encode, base64_decode
+from cryptolab import hex_encode, hex_decode
+from cryptolab import binary_encode, binary_decode
+from cryptolab import InvalidInputError, DecodingError
 
 
 class TestBase64Codec:

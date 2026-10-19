@@ -80,30 +80,127 @@ class Color:
 class Symbol:
     """Unicode symbol tokens - USE THESE INSTEAD OF RAW CHARACTERS."""
 
-    SUCCESS = "✓"
-    ERROR = "✗"
-    WARNING = "⚠"
-    INFO = "ℹ"
-    POINTER = "▸"
-    BULLET = "•"
-    ARROW_UP = "↑"
-    ARROW_DOWN = "↓"
-    ARROW_LEFT = "←"
-    ARROW_RIGHT = "→"
-    CHECK = "✓"
-    CROSS = "✗"
-    ELLIPSIS = "…"
-    BOX_H = "─"
-    BOX_V = "│"
-    BOX_TL = "┌"
-    BOX_TR = "┐"
-    BOX_BL = "└"
-    BOX_BR = "┘"
-    BOX_T = "┬"
-    BOX_B = "┴"
-    BOX_L = "├"
-    BOX_R = "┤"
-    BOX_X = "┼"
+    # Unicode symbols
+    _SUCCESS_UNI = "✓"
+    _ERROR_UNI = "✗"
+    _WARNING_UNI = "⚠"
+    _INFO_UNI = "ℹ"
+    _POINTER_UNI = "▸"
+    _BULLET_UNI = "•"
+    _ARROW_UP_UNI = "↑"
+    _ARROW_DOWN_UNI = "↓"
+    _ARROW_LEFT_UNI = "←"
+    _ARROW_RIGHT_UNI = "→"
+    _CHECK_UNI = "✓"
+    _CROSS_UNI = "✗"
+    _ELLIPSIS_UNI = "…"
+    _BOX_H_UNI = "─"
+    _BOX_V_UNI = "│"
+    _BOX_TL_UNI = "┌"
+    _BOX_TR_UNI = "┐"
+    _BOX_BL_UNI = "└"
+    _BOX_BR_UNI = "┘"
+    _BOX_T_UNI = "┬"
+    _BOX_B_UNI = "┴"
+    _BOX_L_UNI = "├"
+    _BOX_R_UNI = "┤"
+    _BOX_X_UNI = "┼"
+
+    # ASCII fallbacks
+    _SUCCESS_ASCII = "+"
+    _ERROR_ASCII = "x"
+    _WARNING_ASCII = "!"
+    _INFO_ASCII = "i"
+    _POINTER_ASCII = ">"
+    _BULLET_ASCII = "*"
+    _ARROW_UP_ASCII = "^"
+    _ARROW_DOWN_ASCII = "v"
+    _ARROW_LEFT_ASCII = "<"
+    _ARROW_RIGHT_ASCII = ">"
+    _CHECK_ASCII = "+"
+    _CROSS_ASCII = "x"
+    _ELLIPSIS_ASCII = "..."
+    _BOX_H_ASCII = "-"
+    _BOX_V_ASCII = "|"
+    _BOX_TL_ASCII = "+"
+    _BOX_TR_ASCII = "+"
+    _BOX_BL_ASCII = "+"
+    _BOX_BR_ASCII = "+"
+    _BOX_T_ASCII = "+"
+    _BOX_B_ASCII = "+"
+    _BOX_L_ASCII = "+"
+    _BOX_R_ASCII = "+"
+    _BOX_X_ASCII = "+"
+
+    @classmethod
+    def _unicode_supported(cls) -> bool:
+        """Check if the terminal supports Unicode output."""
+        import sys
+        import os
+        if not hasattr(sys.stdout, "isatty") or not sys.stdout.isatty():
+            return False
+        if sys.platform == "win32":
+            return (
+                os.environ.get("WT_SESSION") is not None
+                or "ANSICON" in os.environ
+                or os.environ.get("TERM") is not None
+            )
+        return True
+
+    # Determine Unicode support at class definition time
+    _unicode_ok = _unicode_supported.__func__(None)
+
+    # Public attributes - set based on Unicode support
+    if _unicode_ok:
+        SUCCESS = "✓"
+        ERROR = "✗"
+        WARNING = "⚠"
+        INFO = "ℹ"
+        POINTER = "▸"
+        BULLET = "•"
+        ARROW_UP = "↑"
+        ARROW_DOWN = "↓"
+        ARROW_LEFT = "←"
+        ARROW_RIGHT = "→"
+        CHECK = "✓"
+        CROSS = "✗"
+        ELLIPSIS = "…"
+        BOX_H = "─"
+        BOX_V = "│"
+        BOX_TL = "┌"
+        BOX_TR = "┐"
+        BOX_BL = "└"
+        BOX_BR = "┘"
+        BOX_T = "┬"
+        BOX_B = "┴"
+        BOX_L = "├"
+        BOX_R = "┤"
+        BOX_X = "┼"
+    else:
+        SUCCESS = "+"
+        ERROR = "x"
+        WARNING = "!"
+        INFO = "i"
+        POINTER = ">"
+        BULLET = "*"
+        ARROW_UP = "^"
+        ARROW_DOWN = "v"
+        ARROW_LEFT = "<"
+        ARROW_RIGHT = ">"
+        CHECK = "+"
+        CROSS = "x"
+        ELLIPSIS = "..."
+        BOX_H = "-"
+        BOX_V = "|"
+        BOX_TL = "+"
+        BOX_TR = "+"
+        BOX_BL = "+"
+        BOX_BR = "+"
+        BOX_T = "+"
+        BOX_B = "+"
+        BOX_L = "+"
+        BOX_R = "+"
+        BOX_X = "+"
 
 
 class Spacing:
@@ -132,17 +229,55 @@ class Width:
 # Logo definitions (progressive sizes - block style)
 # ============================================================
 
-LOGO_LARGE = """\
+# Unicode logos
+_LOGO_LARGE_UNI = """\
 ▄▀▀▀▀ █▀▀▀▄ █   █ █▀▀▀▄ ▀▀█▀▀ ▄▀▀▀▄ █     ▄▀▀▀▄ █▀▀▀▄
 █     █▀▀█   ▀▄▀  █▀▀▀    █   █   █ █     █▀▀▀█ █▀▀▀▄
 ▀▀▀▀ ▀   ▀   ▀   ▀       ▀    ▀▀▀  ▀▀▀▀▀ ▀   ▀ ▀▀▀▀"""
 
-LOGO_MEDIUM = """\
+_LOGO_MEDIUM_UNI = """\
 ▄▀▀▀▀ █▀▀▀▄ █   █ █▀▀▀▄
 █     █▀▀█   ▀▄▀  █▀▀▀
 ▀▀▀▀ ▀   ▀   ▀   ▀"""
 
+# ASCII fallbacks
+_LOGO_LARGE_ASCII = """\
++--------+ +--------+ +---+ +---+ +--------+ +---+ +--------+ +---+ +--------+ +---+
+|        | |        | |   | | |        | +---+ |        | |   | | |     |        | |
++--------+ +--------+ +---+ +---+ +--------+ +---+ +--------+ +---+ +--------+ +---+
+"""
+
+_LOGO_MEDIUM_ASCII = """\
++--------+ +--------+ +---+ +---+ +--------+
+|        | |        | |   | | |        |   |
++--------+ +--------+ +---+ +---+ +--------+
+"""
+
 LOGO_TINY = "CRYPTOLAB"
+
+
+def _unicode_supported() -> bool:
+    """Check if the terminal supports Unicode output."""
+    import sys
+    import os
+    if not hasattr(sys.stdout, "isatty") or not sys.stdout.isatty():
+        return False
+    if sys.platform == "win32":
+        return (
+            os.environ.get("WT_SESSION") is not None
+            or "ANSICON" in os.environ
+            or os.environ.get("TERM") is not None
+        )
+    return True
+
+
+# Set logos based on Unicode support
+if _unicode_supported():
+    LOGO_LARGE = _LOGO_LARGE_UNI
+    LOGO_MEDIUM = _LOGO_MEDIUM_UNI
+else:
+    LOGO_LARGE = _LOGO_LARGE_ASCII
+    LOGO_MEDIUM = _LOGO_MEDIUM_ASCII
 
 
 def pick_logo(width: int, max_rows: int = 99) -> str:
@@ -237,6 +372,19 @@ def fit_hints(hints: list[tuple[str, str]], width: int, gap: int = 3) -> list[tu
     return []
 
 
+def render_footer(hints: list[tuple[str, str]], width: int) -> str:
+    """Render footer with thin rule and centered hints."""
+    chosen = list(hints)
+    while chosen:
+        if len((" " * 3).join(f"{k} {l}" for k, l in chosen)) <= width - 2:
+            break
+        chosen.pop()
+    plain = (" " * 3).join(f"{k} {l}" for k, l in chosen)
+    styled = (" " * 3).join(f"{Color.emphasis(k)} {Color.dim(l)}" for k, l in chosen)
+    rule = Color.dim("  " + Symbol.BOX_H * max(width - 4, 0))
+    return rule + "\n" + " " * max((width - len(plain)) // 2, 0) + styled
+
+
 # Standard hint sets
 HINTS_MAIN = [
     (Symbol.ARROW_UP + Symbol.ARROW_DOWN, "navigasi"),
@@ -252,3 +400,17 @@ HINTS_SUB = [
     ("q", "keluar"),
     ("?", "bantuan"),
 ]
+
+
+def render_header(subtitle: str = "", max_logo_rows: int = 99) -> str:
+    """Render header with logo, blank line, and subtitle."""
+    w = term_width()
+    logo = Color.emphasis(center_block(pick_logo(w, max_logo_rows), w))
+    if subtitle:
+        if len(subtitle) > w:
+            subtitle = subtitle.split(" · ")[0]
+        if len(subtitle) > w:
+            subtitle = subtitle[: max(w - 1, 0)] + Symbol.ELLIPSIS
+        sub = Color.dim(subtitle.center(w))
+        return "\n".join(["", logo, "", sub])
+    return "\n".join(["", logo])

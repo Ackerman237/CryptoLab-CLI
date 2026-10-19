@@ -14,8 +14,8 @@ from cryptolab.asymmetric import (
 )
 from cryptolab.banner import warn_rsa_pkcs1v15, print_warning
 
-from cryptolab.exceptions import InvalidInputError
-from cryptolab.utils.history import log_history
+from cryptolab import InvalidInputError
+from cryptolab import log_history
 from cryptolab.cli.formatters import render_box, render_error
 
 

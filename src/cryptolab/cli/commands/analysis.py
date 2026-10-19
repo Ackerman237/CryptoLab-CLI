@@ -3,12 +3,12 @@
 import sys
 from argparse import Namespace
 
-from cryptolab.analysis.detect import detect_format, DetectionResult
-from cryptolab.analysis.auto_decode import auto_decode, AutoDecodeResult
-from cryptolab.analysis.pipeline import run_decode_pipeline, PipelineResult
+from cryptolab import detect_format, DetectionResult
+from cryptolab import auto_decode, AutoDecodeResult
+from cryptolab import run_decode_pipeline, PipelineResult
 
-from cryptolab.exceptions import InvalidInputError
-from cryptolab.utils.history import log_history
+from cryptolab import InvalidInputError
+from cryptolab import log_history
 from cryptolab.cli.formatters import (
     render_detection,
     render_auto_decode,

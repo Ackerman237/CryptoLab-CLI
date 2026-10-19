@@ -3,7 +3,7 @@
 import sys
 from argparse import Namespace
 
-from cryptolab.utils.history import log_history, read_history, clear_history, get_history_file
+from cryptolab import log_history, read_history, clear_history, get_history_file
 from cryptolab.cli.formatters import render_history_list, render_box
 
 

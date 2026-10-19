@@ -3,12 +3,7 @@
 import sys
 from argparse import Namespace
 
-from cryptolab.encoding.base64_codec import base64_encode, base64_decode
-from cryptolab.encoding.hex_codec import hex_encode, hex_decode
-from cryptolab.encoding.binary_codec import binary_encode, binary_decode
-
-from cryptolab.exceptions import InvalidInputError
-from cryptolab.utils.history import log_history
+from cryptolab import base64_encode, base64_decode, hex_encode, hex_decode, binary_encode, binary_decode, InvalidInputError, log_history
 from cryptolab.cli.formatters import render_box
 
 
