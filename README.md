@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <img alt="Preview" src="docs/assets/preview.svg" width="720" />
+  <img alt="Preview" src="docs/assets/preview.png" width="720" />
 </p>
 
 ## Fitur
