@@ -41,6 +41,19 @@ class TestBentukLogo:
         for logo in (b.LOGO_LARGE, b.LOGO_MEDIUM, b.LOGO_SMALL):
             assert not logo.startswith(" ")
 
+    def test_huruf_r_punya_bahu_seperti_p(self):
+        # Regresi: baris tengah R dulu "██  ██" sehingga R terlihat seperti A.
+        # Bahu R harus "█████ " (tertutup) pada baris ke-3 semua logo.
+        for logo in (b.LOGO_LARGE, b.LOGO_MEDIUM, b.LOGO_SMALL):
+            baris3 = logo.splitlines()[2]
+            assert baris3[7:13] == "█████ ", f"bahu R salah: {baris3[7:13]!r}"
+
+    def test_huruf_r_dan_a_berbeda(self):
+        # R: bahu lurus (█████ ) - A: bahu penuh (██████).
+        for logo in (b.LOGO_LARGE, b.LOGO_MEDIUM, b.LOGO_SMALL):
+            baris3 = logo.splitlines()[2]
+            assert baris3[7:13] != "██████"
+
     def test_lebar_menurun_tiap_tingkat(self):
         assert b._block_width(b.LOGO_LARGE) > b._block_width(b.LOGO_MEDIUM)
         assert b._block_width(b.LOGO_MEDIUM) > b._block_width(b.LOGO_SMALL)
