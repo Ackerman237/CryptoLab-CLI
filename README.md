@@ -35,7 +35,7 @@
 |---|---|
 | Auto Analyze | Deteksi encoding bertingkat (maks. 5 tahap), Caesar brute-force, kandidat cipher ber-kunci |
 | Classical | Caesar, Vigenere, Playfair, Hill, Affine, Rail Fence |
-| Symmetric | DES, RC2 (legacy), AES (CBC/ECB/GCM) |
+| Symmetric | DES, RC2 (legacy), AES (CBC/ECB/GCM), **Mode File** (AES-GCM/CBC dari/ke berkas) |
 | Hashing & MAC | MD5, SHA1, SHA256, SHA512, HMAC, PBKDF2, Bcrypt (opsional) |
 | Asymmetric | RSA (OAEP, PKCS#1 v1.5, PSS), Diffie-Hellman |
 | Encoding | Base64, Hex, Binary |
@@ -262,6 +262,9 @@ cryptolab
 ```bash
 cryptolab caesar brute-force -t "KHOOR" --best
 cryptolab hash compute -t "data" --algo SHA256
+cryptolab hash file -f dokumen.pdf
+cryptolab aes-gcm encrypt -f foto.jpg -o foto.jpg.raw --format raw -k "kunci-enambelas!"
+cryptolab aes-gcm decrypt -f foto.jpg.raw -o foto.out.jpg --format raw -k "kunci-enambelas!"
 cryptolab rsa keygen --bits 2048 --out-dir ./keys
 ```
 
