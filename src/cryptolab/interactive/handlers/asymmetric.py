@@ -145,7 +145,7 @@ def _handle_rsa_encrypt() -> None:
     while True:
         message = Prompt.ask("Masukkan plaintext untuk dienkripsi")
         if not message:
-            Message.warning("Plaintext tidak boleh kosong")
+            Message.print_warning("Plaintext tidak boleh kosong")
             continue
 
         try:
@@ -207,7 +207,7 @@ def _handle_rsa_decrypt() -> None:
     while True:
         ciphertext = Prompt.ask("Masukkan ciphertext")
         if not ciphertext:
-            Message.warning("Ciphertext tidak boleh kosong")
+            Message.print_warning("Ciphertext tidak boleh kosong")
             continue
 
         try:
@@ -269,7 +269,7 @@ def _handle_rsa_sign() -> None:
     while True:
         message = Prompt.ask("Masukkan pesan untuk ditandatangani")
         if not message:
-            Message.warning("Pesan tidak boleh kosong")
+            Message.print_warning("Pesan tidak boleh kosong")
             continue
 
         try:
@@ -329,12 +329,12 @@ def _handle_rsa_verify() -> None:
     while True:
         message = Prompt.ask("Masukkan pesan asli")
         if not message:
-            Message.warning("Pesan tidak boleh kosong")
+            Message.print_warning("Pesan tidak boleh kosong")
             continue
 
         signature = Prompt.ask("Masukkan signature")
         if not signature:
-            Message.warning("Signature tidak boleh kosong")
+            Message.print_warning("Signature tidak boleh kosong")
             continue
 
         try:
@@ -480,7 +480,7 @@ def _handle_dh_derive() -> None:
     while True:
         shared = Prompt.ask("Masukkan shared secret (hex)")
         if not shared:
-            Message.warning("Shared secret tidak boleh kosong")
+            Message.print_warning("Shared secret tidak boleh kosong")
             continue
 
         keylen = Prompt.ask_int("Key length (bytes) [32]", default=32, min_val=1)

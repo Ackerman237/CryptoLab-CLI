@@ -55,6 +55,78 @@ def _rule(w):
     return " " * MARGIN + paint("─" * max(w - 2 * MARGIN, 0), DIM)
 
 
+def _drain_extra_lines():
+    """Buang sisa baris di buffer stdin setelah ``input()``.
+
+    Saat pengguna menempel (paste) teks multi-baris, ``input()`` hanya
+    mengembalikan baris pertama; sisanya tertinggal di buffer dan akan
+    terbaca sebagai jawaban untuk prompt-prompt berikutnya - inilah penyebab
+    "input saya sendiri muncul di pertanyaan berikutnya".
+
+    Mengembalikan jumlah baris tambahan yang dibuang (0 bila tidak ada),
+    supaya pemanggil bisa memberi tahu pengguna alih-alih memotong diam-diam.
+
+    Catatan: hanya relevan untuk input interaktif (TTY). Saat stdin adalah
+    pipe/redirect, penanganannya dilakukan oleh ``_read_line`` yang membaca
+    dari iterator baris, bukan di sini.
+    """
+    if not _stdin_is_tty():
+        return 0
+    chars = []
+    try:
+        import msvcrt                          # Windows
+        while msvcrt.kbhit():
+            ch = msvcrt.getwch()
+            if ch == "\x03":                   # Ctrl+C
+                raise KeyboardInterrupt
+            if ch == "\x1a":                   # Ctrl+Z (EOF)
+                break
+            chars.append(ch)
+    except ImportError:
+        try:
+            import select                      # POSIX
+            while select.select([sys.stdin], [], [], 0)[0]:
+                ch = sys.stdin.read(1)
+                if not ch:
+                    break
+                chars.append(ch)
+        except (OSError, ValueError):
+            return 0
+    if not chars:
+        return 0
+    # Hitung baris: setiap "\n" menandai satu baris tambahan yang dibuang.
+    text = "".join(chars).replace("\r\n", "\n").replace("\r", "\n")
+    return max(text.count("\n"), 1 if text.strip() else 0)
+
+
+def _stdin_is_tty() -> bool:
+    """Apakah stdin berjalan di terminal interaktif (bukan pipe/redirect)."""
+    try:
+        return bool(sys.stdin and sys.stdin.isatty())
+    except (AttributeError, ValueError):
+        return False
+
+
+def _read_line(prompt: str, secret: bool) -> str:
+    """Baca satu baris input, aman untuk TTY maupun pipe/redirect.
+
+    - TTY: ``input()``/``getpass()`` seperti biasa.
+    - Non-TTY (pipe/redirect): baca langsung dari ``sys.stdin`` per baris,
+      supaya sisa baris setelah baris pertama TIDAK ikut terbaca oleh prompt
+      berikutnya (perilaku lama: seluruh isi pipe "bocor" ke prompt lain).
+    """
+    if secret:
+        return getpass.getpass(prompt)
+    if not _stdin_is_tty():
+        sys.stdout.write(prompt)
+        sys.stdout.flush()
+        line = sys.stdin.readline()
+        if line == "":
+            raise EOFError
+        return line.rstrip("\r\n")
+    return input(prompt)
+
+
 def header_lines(title, hint="ctrl+c batal"):
     """Header ringkas untuk layar aksi: 'CRYPTOLAB › Judul' + hint kanan + garis."""
     w = term_width()
@@ -90,19 +162,33 @@ class Ctx:
         print(" " * MARGIN + paint(f"✗ {msg}", RED))
 
     def _read(self, label, default, cast, secret):
-        """Baca satu input dengan validasi dan tanya ulang."""
+        """Baca satu input dengan validasi dan tanya ulang.
+
+        Menangani paste multi-baris: ``input()`` hanya mengambil satu baris,
+        sisanya tertinggal di buffer stdin dan akan "terketik sendiri" pada
+        prompt berikutnya. Karena itu sisa buffer dibuang (drain) setelah
+        baris pertama dibaca, dan bila yang ditempel ternyata multi-baris kita
+        beri tahu pengguna alih-alih diam-diam memotong datanya.
+        """
         suffix = f" [{default}]" if default is not None else ""
         prompt = " " * MARGIN + f"{label}{suffix} › "
         while True:
             try:
-                raw = (getpass.getpass(prompt) if secret else input(prompt)).strip()
+                raw = _read_line(prompt, secret).strip()
             except (KeyboardInterrupt, EOFError):
                 raise Cancelled()
+            extra = "" if secret else _drain_extra_lines()
             if raw == "":
                 if default is None:
                     self._error("tidak boleh kosong")
                     continue
                 return default
+            if extra:
+                # Paste multi-baris: jangan potong diam-diam.
+                self._error(
+                    f"input berisi {extra + 1} baris - hanya baris pertama dipakai "
+                    "(gabungkan jadi satu baris atau pakai tanpa Enter)"
+                )
             try:
                 return cast(raw)
             except ValueError as e:
@@ -128,7 +214,12 @@ class Ctx:
             print(" " * (MARGIN + 2) + paint(str(i), BOLD + WHITE) + "  " + opt)
 
         def pick(raw):
-            n = int(raw)
+            text = raw.strip()
+            if not text.isdigit():
+                raise ValueError(
+                    f"masukkan angka pilihan (1-{len(options)}), bukan teks"
+                )
+            n = int(text)
             if not 1 <= n <= len(options):
                 raise ValueError(f"pilih 1-{len(options)}")
             return n

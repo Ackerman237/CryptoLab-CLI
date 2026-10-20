@@ -77,6 +77,15 @@ def hex_decode(hex_str: str, encoding: str = "utf-8") -> str:
 
     # Validate characters: sisa non-hex hanya boleh 'x'/'X' (prefix di tengah)
     if not re.fullmatch(r"[0-9a-fA-F]+", cleaned):
+        # Kasus umum: pengguna menempel output bahasa pemrograman ("0x48 0x69").
+        # Perilaku lama tetap dipertahankan (input DITOLAK, lihat baseline
+        # Tahap 0), tapi pesannya dibuat ramah dan memberi solusi jelas.
+        if re.search(r"0[xX][0-9a-fA-F]", original):
+            raise DecodingError(
+                "Input memakai prefix '0x' di setiap byte (mis. '0x48 0x69'). "
+                "Hapus dulu semua '0x'-nya, atau pilih mode pemisah 'Prefix 0x' "
+                "saat menulis keluaran Hex."
+            )
         invalid_chars = set(re.findall(r"[^0-9a-fA-F]", cleaned))
         raise DecodingError(
             f"String Hexadecimal mengandung karakter tidak valid: {', '.join(sorted(invalid_chars))}"
