@@ -19,25 +19,22 @@
 | 6 | Rapikan sisa rev-3 di header/§3 (kini rev-6); hapus ambiguitas **F2 vs F3** di §6; koreksi panjang hex F0b (`os.urandom(64)` → **128** char, bukan 62+); catat hasil cek `pyproject.toml` (`python_files` tidak diubah → `verify_*.py` tetap tidak dikoleksi); tandai `verify_field_placement.py` sebagai bukti semantik saja, dilipat/hapus setelah F0b. |
 | 7 | Koreksi §6.3 butir 3: kasus `-t` + `-f` bersama **tidak mungkin** direkam di F0 (opsi `-f` belum ada → pesan saat ini `unrecognized arguments`). F0 merekam perilaku apa adanya; `-t` + `-f` + pembaruan snapshot dipindah ke F1. |
 | 8 | **Koreksi berdasarkan temuan F0** (§1.3): `hash` **sudah** punya `-f/--file` + `--encoding` → F2 = **selaraskan** (bukan tambah), kontrak §1.3a dikunci. Kebijakan eksklusivitas **per perintah** (`required=True` hanya untuk 17 perintah ber-`-t`-wajib; `hash`/`rsa` → `required=False`, galat tetap di handler). Cakupan F1 = **hanya AES-GCM & AES-CBC** (churn snapshot kecil). F3 **didefinisikan ulang** (sisa kandidat: `hmac`; else hapus). Catat bahwa `rsa encrypt`/`hash compute` gagal di **handler**, bukan argparse. |
-| 9 | **Keputusan reviewer atas rev-8:** **F3 dihapus** → `hmac --file` jadi **X7** (out-of-scope). **F2 dihapus** & diserap **F5** (dokumentasi saja). **`hash`/`rsa` tidak disentuh** di parser (saran `required=False` rev-8 dibatalkan: memasang mutual-exclusion pada `hash` mengubah `-t`+`-f` yang valid jadi galat). Urutan final: **F0 → F0b → F1 → F4 → F5**. **D11 diimplementasi di F0b**: `raw_bytes` diselipkan di `AesGcmResult` + diisi di 2 konstruktor; `verify_field_placement.py` dihapus (dilipat ke `TestF0bAesGcmRawBytes`). |
+| 9 | **Keputusan reviewer atas rev-8:** **F3 dihapus** → `hmac --file` jadi **X7** (out-of-scope). **F2 dihapus** & diserap **F5** (dokumentasi saja). **`hash`/`rsa` tidak disentuh** di parser (saran `required=False` rev-8 dibatalkan: memasang mutual-exclusion pada `hash` mengubah `-t`+`-f` yang valid jadi galat). Urutan final: **F0 → F0b → F1 → F4 → F5**. **D11 diimplementasi di F0b**: `raw_bytes` diselipkan di `AesGcmResult` + diisi di 2 konstruktor; `verify_field_placement.py` dihapus (dilipat ke `TestF0bAesGcmRawBytes`). **Semua skrip `verify_*.py` dihapus**; `verify_core_bytes.py` → `TestF0bCoreMenerimaBytes`. |
 
-**Verifikasi core (diminta reviewer):** dicek langsung, lihat §1.1, §1.2, dan
-`tests/file_mode/verify_core_bytes.py` (skrip pembuktian yang bisa dijalankan).
+**Verifikasi core (diminta reviewer):** dicek langsung, lihat §1.1 dan §1.2; kini
+**dijaga suite**, bukan skrip manual — `tests/test_file_mode.py::TestF0bCoreMenerimaBytes`.
 
-> **Status skrip di `tests/file_mode/`.** Berkas `verify_core_bytes.py` bernama
-> `verify_*.py`, **bukan** `test_*.py`, sehingga **tidak dikoleksi pytest**.
-> Ini disengaja: alat bukti manual (dijalankan dengan
-> `python tests/file_mode/verify_core_bytes.py`), bukan bagian dari suite tes.
->
-> **`verify_field_placement.py` sudah DIHAPUS di F0b** (rev-9), sesuai catatan
-> sebelumnya: isinya (posisi field `raw_bytes` + bukti semantik Python) kini
-> **dilipat** ke `tests/test_file_mode.py::TestF0bAesGcmRawBytes`. Bukti nyata
-> untuk D11 adalah tes F0b tersebut, bukan skrip tiruan.
+> **Semua skrip `verify_*.py` di `tests/file_mode/` SUDAH DIHAPUS** dan dilipat ke
+> suite (rev-9):
+> - `verify_core_bytes.py` → `TestF0bCoreMenerimaBytes` (CBC & GCM menerima
+>   `bytes`; `raw_bytes` == plaintext untuk `os.urandom(64)`). F1 bergantung pada
+>   kontrak ini, jadi ia dijaga suite.
+> - `verify_field_placement.py` → `TestF0bAesGcmRawBytes` (posisi field
+>   `raw_bytes` + bukti semantik; bukti nyata D11 = tes F0b).
 >
 > **Sudah diverifikasi (bukan asumsi):** `pyproject.toml` hanya menetapkan
 > `[tool.pytest.ini_options] testpaths = ["tests"]` dan `pythonpath = ["src"]` —
 > **tidak** mengubah `python_files`. Tidak ada `pytest.ini`/`setup.cfg`/`tox.ini`.
-> Dicek dengan `pytest --collect-only tests/file_mode/` → **`no tests collected`**.
 
 ---
 

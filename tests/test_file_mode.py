@@ -566,3 +566,57 @@ class TestF0bRegresiGcm:
                 technical_success=True,
                 # raw_bytes omitted on purpose
             )
+
+
+class TestF0bCoreMenerimaBytes:
+    """Core accepts ``bytes`` and round-trips binary (folds ``verify_core_bytes.py``).
+
+    F1 depends on this contract (§1.1): both AES-CBC and AES-GCM must accept
+    ``bytes`` plaintext and return the ORIGINAL bytes in ``raw_bytes``. This is
+    now guarded by the suite instead of a manual script.
+    """
+
+    KEY = b"kunci-enambelas!"  # 16 byte (AES-128)
+    IV = b"iv-enam-belas-by"  # 16 byte
+
+    KASUS = [
+        (b"halo", "utf8-biasa"),
+        (b"deadbeef", "hex-valid"),
+        (os.urandom(64), "biner-acak"),
+    ]
+
+    @pytest.mark.parametrize("data", [b"halo", b"deadbeef", os.urandom(64)])
+    def test_aes_cbc_menerima_bytes_dan_raw_bytes_sama(self, data):
+        from cryptolab.core.symmetric.aes import aes_decrypt, aes_encrypt
+
+        enc = aes_encrypt(data, self.KEY, mode="CBC", iv=self.IV)
+        back = aes_decrypt(enc.output_text, self.KEY, mode="CBC", iv=self.IV)
+        assert back.raw_bytes == data
+
+    @pytest.mark.parametrize("data", [b"halo", b"deadbeef", os.urandom(64)])
+    def test_aes_gcm_menerima_bytes_dan_raw_bytes_sama(self, data):
+        from cryptolab.core.symmetric.aes import aes_gcm_decrypt, aes_gcm_encrypt
+
+        enc = aes_gcm_encrypt(data, self.KEY)
+        back = aes_gcm_decrypt(enc.payload, self.KEY)
+        assert back.raw_bytes == data
+
+    def test_raw_bytes_urandom_64_identik(self):
+        """Explicit §1.1 case: os.urandom(64) round-trips byte-for-byte (both modes)."""
+        from cryptolab.core.symmetric.aes import (
+            aes_decrypt,
+            aes_encrypt,
+            aes_gcm_decrypt,
+            aes_gcm_encrypt,
+        )
+
+        data = os.urandom(64)
+        cbc = aes_decrypt(
+            aes_encrypt(data, self.KEY, mode="CBC", iv=self.IV).output_text,
+            self.KEY,
+            mode="CBC",
+            iv=self.IV,
+        )
+        gcm = aes_gcm_decrypt(aes_gcm_encrypt(data, self.KEY).payload, self.KEY)
+        assert cbc.raw_bytes == data
+        assert gcm.raw_bytes == data
