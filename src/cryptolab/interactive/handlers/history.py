@@ -48,6 +48,6 @@ def handle_history() -> None:
             if confirm in ("y", "ya", "yes"):
                 success = clear_history()
                 if success:
-                    Message.success("Riwayat analisis lokal berhasil dibersihkan")
+                    Message.print_success("Riwayat analisis lokal berhasil dibersihkan")
                 else:
-                    Message.error("Gagal", "Tidak dapat menghapus file riwayat")
+                    Message.print_error("Gagal", "Tidak dapat menghapus file riwayat")

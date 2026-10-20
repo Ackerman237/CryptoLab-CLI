@@ -350,4 +350,6 @@ def run_interactive_menu() -> None:
         show_cursor()
         if use_alt_screen:
             alt_screen_exit()
+        # Pesan perpisahan (pulihkan perilaku menu lama).
+        print("\n  Terima kasih telah menggunakan CryptoLab CLI. Sampai jumpa!\n")
         sys.stdout.flush()
