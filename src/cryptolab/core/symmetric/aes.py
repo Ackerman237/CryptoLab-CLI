@@ -366,6 +366,7 @@ class AesGcmResult:
     output_text: str
     is_utf8: bool
     technical_success: bool
+    raw_bytes: bytes  # byte ASLI hasil operasi (ct saat encrypt, pt saat decrypt)
     status_message: str = ""
     reasons: List[str] = field(default_factory=list)
 
@@ -412,6 +413,7 @@ def aes_gcm_encrypt(plaintext: Union[str, bytes], key: Union[str, bytes]) -> Aes
         output_text=payload,
         is_utf8=False,
         technical_success=True,
+        raw_bytes=ct_bytes,
         status_message=f"Enkripsi AES-GCM-{len(key_bytes) * 8} berhasil (tag 128-bit).",
         reasons=[f"Nonce acak {GCM_NONCE_BYTES} byte dari secrets.token_bytes"],
     )
@@ -493,6 +495,7 @@ def aes_gcm_decrypt(payload: str, key: Union[str, bytes]) -> AesGcmResult:
         output_text=output_text,
         is_utf8=is_utf8,
         technical_success=True,
+        raw_bytes=pt_bytes,
         status_message=status_msg,
         reasons=["Tag autentikasi diverifikasi (AEAD)"],
     )
