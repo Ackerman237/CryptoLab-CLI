@@ -11,7 +11,7 @@ Panduan kunci/IV:
 
 from cryptolab.flow import Result
 from cryptolab.core.symmetric.des import des_encrypt, des_decrypt
-from cryptolab.core.symmetric.aes import aes_encrypt, aes_decrypt
+from cryptolab.core.symmetric.aes import aes_encrypt, aes_decrypt, aes_gcm_encrypt, aes_gcm_decrypt
 from cryptolab.core.symmetric.rc2 import rc2_encrypt, rc2_decrypt
 from cryptolab.core.utils.history import log_history
 
@@ -78,6 +78,33 @@ def fn_aes(ctx):
 
 
 fn_aes._ctx_fn = True
+
+
+def fn_aes_gcm(ctx):
+    """AES-GCM (Tahap 3): enkripsi/dekripsi terautentikasi dengan nonce acak 12 byte."""
+    op = ctx.choose("Operasi", ["Enkripsi", "Dekripsi"])
+    key = ctx.ask("Kunci (16/24/32 karakter untuk AES-128/192/256)", secret=True)
+
+    if op == "Enkripsi":
+        plaintext = ctx.ask("Plaintext")
+        res = ctx.work("Mengenkripsi AES-GCM", lambda: aes_gcm_encrypt(plaintext, key))
+        log_history("AES-GCM Encrypt", plaintext, res.payload, {"mode": "GCM"})
+        return Result([
+            ("Mode", "AES-GCM (AEAD)"),
+            ("Nonce (hex, 12 byte)", res.nonce_hex),
+            ("Payload (nonce:ciphertext:tag)", res.payload),
+        ])
+
+    payload = ctx.ask("Payload (nonce:ciphertext:tag)")
+    res = ctx.work("Mendekripsi AES-GCM", lambda: aes_gcm_decrypt(payload, key))
+    log_history("AES-GCM Decrypt", payload, res.output_text, {"mode": "GCM"})
+    rows = [("Mode", "AES-GCM (AEAD)"), ("Tag", "VALID"), ("Plaintext", res.output_text)]
+    if not res.is_utf8:
+        rows.append(("(bukan UTF-8)", "ditampilkan dalam hex"))
+    return Result(rows)
+
+
+fn_aes_gcm._ctx_fn = True
 
 
 def fn_rc2(ctx):

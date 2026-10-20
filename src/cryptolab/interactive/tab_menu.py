@@ -7,11 +7,11 @@ Menu baru tambahan di atas menu lama (bukan pengganti):
 - Mode sempit: bila seluruh tab tidak muat, hanya tab aktif yang tampil.
 - Karakter kotak memakai ``Symbol`` (fallback ASCII otomatis dari ui.theme).
 - Fallback ke menu lama bila stdin/stdout bukan TTY (lihat run_interactive_menu).
-
-Item tanpa handler (``target=None``) adalah mode baru Tahap 3: tampil dengan
-tag ``baru``, tapi Enter hanya menampilkan status "belum tersedia".
+- Item tanpa handler (``target=None``) butuh dependency baru: saat ini hanya
+  Argon2id / bcrypt; Enter menampilkan status "belum tersedia".
+  Mode Tahap 3 lain (SHA-3, SHA-512, HMAC-SHA-256, AES-GCM, Digital
+  Signature, Generate Key) sudah punya handler.
 """
-
 from cryptolab.banner import (
     paint, vlen, term_width, BOLD, DIM, GREEN, CYAN, YELLOW,
 )
@@ -21,8 +21,14 @@ from cryptolab.interactive.handlers.ctx_encoding import fn_base64, fn_hex, fn_bi
 from cryptolab.interactive.handlers.ctx_analysis import fn_auto
 from cryptolab.interactive.handlers.ctx_history import fn_history
 from cryptolab.interactive.handlers.ctx_classical import fn_caesar, fn_vigenere
-from cryptolab.interactive.handlers.ctx_symmetric import fn_des, fn_aes, fn_rc2
-from cryptolab.interactive.handlers.ctx_hashing import fn_hash
+from cryptolab.interactive.handlers.ctx_symmetric import fn_des, fn_aes, fn_aes_gcm, fn_rc2
+from cryptolab.interactive.handlers.ctx_hashing import (
+    fn_hash,
+    fn_sha3,
+    fn_sha512,
+    fn_hmac256,
+    fn_keygen,
+)
 from cryptolab.interactive.handlers.ctx_asymmetric import fn_rsa, fn_dh
 
 __all__ = ["CATEGORIES", "tab_menu_lines", "run_tab_menu"]
@@ -38,20 +44,21 @@ CATEGORIES = [
     ]),
     ("Simetris", [
         ("AES", fn_aes, ""),
-        ("AES-GCM", None, "baru"),
+        ("AES-GCM", fn_aes_gcm, "baru"),
         ("DES", fn_des, "usang"),
         ("RC2", fn_rc2, "usang"),
     ]),
     ("Asimetris", [
         ("RSA", fn_rsa, ""),
         ("Diffie-Hellman", fn_dh, ""),
-        ("Digital Signature", None, "baru"),
+        # RSA-PSS (rsa_sign/rsa_verify) sudah ada di core; fn_rsa memuat Sign/Verify.
+        ("Digital Signature", fn_rsa, "baru"),
     ]),
     ("Hash", [
         ("Hashing & Password", fn_hash, ""),
-        ("SHA-3", None, "baru"),
-        ("SHA-512", None, "baru"),
-        ("HMAC-SHA-256", None, "baru"),
+        ("SHA-3", fn_sha3, "baru"),
+        ("SHA-512", fn_sha512, "baru"),
+        ("HMAC-SHA-256", fn_hmac256, "baru"),
         ("Argon2id / bcrypt", None, "baru"),
     ]),
     ("Encoding", [
@@ -62,6 +69,7 @@ CATEGORIES = [
     ("Utilitas", [
         ("Auto Analyze", fn_auto, ""),
         ("Riwayat", fn_history, ""),
+        ("Generate Key", fn_keygen, "baru"),
     ]),
 ]
 
@@ -159,7 +167,9 @@ def run_tab_menu(dispatch, read_key) -> None:
         elif key == "enter":
             label, target = items[ai][:2]
             if target is None:
-                status = f"{label} belum tersedia - mode baru ditambahkan di Tahap 3."
+                # Argon2id/bcrypt butuh dependency baru (argon2-cffi/bcrypt),
+                # sementara proyek memakai stdlib + pycryptodome saja.
+                status = f"{label} belum tersedia - butuh dependency baru (argon2-cffi/bcrypt)."
             elif dispatch(label, target):
                 return
         elif key in ("q", "esc"):

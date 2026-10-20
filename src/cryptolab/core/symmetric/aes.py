@@ -5,6 +5,7 @@ Designed for educational clarity, CTF challenges, and industry-standard symmetri
 """
 
 import re
+import secrets
 from dataclasses import dataclass, field
 from typing import List, Optional, Union
 
@@ -346,3 +347,152 @@ def aes_auto_analyze(
         key=lambda r: (r.readable_success, r.is_utf8, r.score), reverse=True
     )
     return candidates
+
+
+# ---------- AES-GCM (Tahap 3 upgrade) ----------
+
+GCM_NONCE_BYTES = 12   # 96-bit nonce sesuai rekomendasi NIST SP 800-38D
+GCM_TAG_BYTES = 16     # 128-bit authentication tag
+
+
+@dataclass
+class AesGcmResult:
+    """Result of an AES-GCM authenticated encryption/decryption."""
+
+    operation: str  # "encrypt" or "decrypt"
+    key_repr: str
+    nonce_hex: str
+    payload: str  # "nonce_hex:ciphertext_hex:tag_hex" (siap disimpan/dikirim)
+    output_text: str
+    is_utf8: bool
+    technical_success: bool
+    status_message: str = ""
+    reasons: List[str] = field(default_factory=list)
+
+
+def _validate_aes_key(key: Union[str, bytes]) -> bytes:
+    key_bytes = _to_bytes(key, "Key AES")
+    if len(key_bytes) not in (16, 24, 32):
+        raise InvalidKeyError(
+            f"Panjang key AES harus 16 byte (AES-128), 24 byte (AES-192), atau 32 byte (AES-256). "
+            f"Ditemukan: {len(key_bytes)} byte."
+        )
+    return key_bytes
+
+
+def aes_gcm_encrypt(plaintext: Union[str, bytes], key: Union[str, bytes]) -> AesGcmResult:
+    """Encrypt using AES-GCM (AEAD) with a fresh random 96-bit nonce.
+
+    Args:
+        plaintext: String or bytes to encrypt.
+        key: 16, 24, or 32 byte key.
+
+    Returns:
+        AesGcmResult with nonce, ciphertext, tag, dan payload gabungan.
+
+    Raises:
+        InvalidKeyError: If key length is not 16, 24, or 32 bytes.
+    """
+    key_bytes = _validate_aes_key(key)
+    pt_bytes = _to_bytes(plaintext, "Plaintext")
+
+    nonce = secrets.token_bytes(GCM_NONCE_BYTES)
+    cipher = AES.new(key_bytes, AES.MODE_GCM, nonce=nonce, mac_len=GCM_TAG_BYTES)
+    ct_bytes = cipher.encrypt(pt_bytes)
+    tag = cipher.digest()
+
+    nonce_hex = nonce.hex()
+    payload = f"{nonce_hex}:{ct_bytes.hex()}:{tag.hex()}"
+
+    return AesGcmResult(
+        operation="encrypt",
+        key_repr=key_bytes.decode("utf-8", errors="replace"),
+        nonce_hex=nonce_hex,
+        payload=payload,
+        output_text=payload,
+        is_utf8=False,
+        technical_success=True,
+        status_message=f"Enkripsi AES-GCM-{len(key_bytes) * 8} berhasil (tag 128-bit).",
+        reasons=[f"Nonce acak {GCM_NONCE_BYTES} byte dari secrets.token_bytes"],
+    )
+
+
+def aes_gcm_decrypt(payload: str, key: Union[str, bytes]) -> AesGcmResult:
+    """Decrypt an AES-GCM payload "nonce_hex:ciphertext_hex:tag_hex".
+
+    Args:
+        payload: String gabungan dari ``aes_gcm_encrypt``.
+        key: 16, 24, or 32 byte key.
+
+    Returns:
+        AesGcmResult berisi plaintext (UTF-8 atau hex bila bukan teks).
+
+    Raises:
+        InvalidInputError: If the payload format is invalid.
+        InvalidKeyError: If key length is not 16, 24, or 32 bytes.
+        DecodingError: If authentication tag verification fails.
+    """
+    key_bytes = _validate_aes_key(key)
+
+    if not isinstance(payload, str):
+        raise InvalidInputError("Payload AES-GCM harus berupa string 'nonce:ciphertext:tag'.")
+    parts = payload.strip().split(":")
+    if len(parts) != 3:
+        raise InvalidInputError(
+            "Format payload AES-GCM tidak valid. Harus 'nonce:ciphertext:tag' dalam hex."
+        )
+
+    nonce_hex, ct_hex, tag_hex = (p.strip().lower() for p in parts)
+    if not (re.fullmatch(r"[0-9a-f]+", nonce_hex or "") and
+            re.fullmatch(r"[0-9a-f]*", ct_hex) and
+            re.fullmatch(r"[0-9a-f]+", tag_hex or "")):
+        raise InvalidInputError(
+            "Payload AES-GCM mengandung karakter bukan heksadesimal. Harus 'nonce:ciphertext:tag' dalam hex."
+        )
+
+    nonce = bytes.fromhex(nonce_hex)
+    if len(nonce) != GCM_NONCE_BYTES:
+        raise InvalidInputError(
+            f"Nonce AES-GCM harus {GCM_NONCE_BYTES} byte ({GCM_NONCE_BYTES * 2} karakter hex). "
+            f"Ditemukan: {len(nonce)} byte."
+        )
+    tag = bytes.fromhex(tag_hex)
+    if len(tag) != GCM_TAG_BYTES:
+        raise InvalidInputError(
+            f"Tag AES-GCM harus {GCM_TAG_BYTES} byte ({GCM_TAG_BYTES * 2} karakter hex). "
+            f"Ditemukan: {len(tag)} byte."
+        )
+    ct_bytes = bytes.fromhex(ct_hex)
+
+    cipher = AES.new(key_bytes, AES.MODE_GCM, nonce=nonce, mac_len=GCM_TAG_BYTES)
+    try:
+        pt_bytes = cipher.decrypt_and_verify(ct_bytes, tag)
+    except ValueError:
+        # Pesan generik: tidak membocorkan detail padding/tag mana yang salah.
+        raise DecodingError(
+            "Tag autentikasi AES-GCM tidak valid: data rusak, atau kunci/nonce tidak sesuai."
+        )
+
+    try:
+        output_text = pt_bytes.decode("utf-8")
+        is_utf8 = True
+        status_msg = "Dekripsi AES-GCM berhasil dan tag autentikasi valid."
+    except UnicodeDecodeError:
+        output_text = pt_bytes.hex()
+        is_utf8 = False
+        status_msg = (
+            "Dekripsi AES-GCM berhasil (tag valid), namun hasil bukan teks UTF-8 "
+            "(ditampilkan dalam format Hex)."
+        )
+
+    return AesGcmResult(
+        operation="decrypt",
+        key_repr=key_bytes.decode("utf-8", errors="replace"),
+        nonce_hex=nonce_hex,
+        payload=payload.strip(),
+        output_text=output_text,
+        is_utf8=is_utf8,
+        technical_success=True,
+        status_message=status_msg,
+        reasons=["Tag autentikasi diverifikasi (AEAD)"],
+    )

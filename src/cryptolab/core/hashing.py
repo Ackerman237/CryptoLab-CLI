@@ -115,7 +115,7 @@ def hash_compute(
 
     Args:
         data: Input string or bytes to hash.
-        algorithm: Hash algorithm (MD5, SHA1, SHA256, SHA512).
+        algorithm: Hash algorithm (MD5, SHA1, SHA256, SHA512, SHA3-256, SHA3-512).
         encoding: Output encoding: "hex" (default) or "base64".
 
     Returns:
@@ -132,6 +132,8 @@ def hash_compute(
         "SHA1": hashlib.sha1,
         "SHA256": hashlib.sha256,
         "SHA512": hashlib.sha512,
+        "SHA3-256": hashlib.sha3_256,
+        "SHA3-512": hashlib.sha3_512,
     }
 
     if algo not in hash_funcs:
@@ -172,6 +174,8 @@ def hash_file(filepath: str, algorithm: str = "SHA256") -> HashResult:
         "SHA1": hashlib.sha1,
         "SHA256": hashlib.sha256,
         "SHA512": hashlib.sha512,
+        "SHA3-256": hashlib.sha3_256,
+        "SHA3-512": hashlib.sha3_512,
     }
     if algo not in hash_funcs:
         raise InvalidInputError(f"Algoritma tidak didukung: {algorithm}")
@@ -478,7 +482,7 @@ def generate_random_bytes(length: int = 32, encoding: str = "hex") -> str:
     return random_bytes.hex()
 
 
-SUPPORTED_HASH_ALGOS = ["MD5", "SHA1", "SHA256", "SHA512"]
+SUPPORTED_HASH_ALGOS = ["MD5", "SHA1", "SHA256", "SHA512", "SHA3-256", "SHA3-512"]
 SUPPORTED_HMAC_ALGOS = ["HMAC-MD5", "HMAC-SHA1", "HMAC-SHA256", "HMAC-SHA512"]
 SUPPORTED_PBKDF2_ALGOS = ["PBKDF2-SHA256", "PBKDF2-SHA512"]
 SUPPORTED_PASSWORD_ALGOS = ["PBKDF2-SHA256", "PBKDF2-SHA512"] + (["BCRYPT"] if BCRYPT_AVAILABLE else [])

@@ -83,18 +83,24 @@ class TestNavigasiTab:
 
 
 class TestItemBaruTahap3:
-    def test_item_tanpa_handler_tampilkan_status(self, capsys):
-        # AES-GCM (target None): Enter -> status, bukan crash / dispatch.
-        calls, out = _run(["right", "down", "enter", "q"], capsys)
-        assert calls == []
-        assert "AES-GCM" in out
-        assert "Tahap 3" in out
+    def test_semua_item_tahap3_sudah_punya_handler_kecuali_argon2(self):
+        # Setelah Tahap 3: hanya Argon2id/bcrypt yang belum punya handler
+        # (butuh dependency baru - lihat laporan Tahap 3).
+        tanpa_handler = [
+            f"{name}/{label}"
+            for name, group in CATEGORIES
+            for label, target, _tag in group
+            if target is None
+        ]
+        assert tanpa_handler == ["Hash/Argon2id / bcrypt"]
 
-    def test_semua_item_target_none_ada_di_CATEGORIES(self):
-        for name, group in CATEGORIES:
-            for label, target, tag in group:
-                if target is None:
-                    assert tag == "baru", f"{name}/{label} tanpa handler harus tag baru"
+    def test_item_belum_tersedia_tampilkan_status(self, capsys):
+        # Argon2id / bcrypt (target None): Enter -> status, bukan crash.
+        # Tab Hash: 4 = Hash, item ke-4 = Argon2id / bcrypt.
+        calls, out = _run(["4", "down", "down", "down", "down", "enter", "q"], capsys)
+        assert calls == []
+        assert "Argon2id" in out
+        assert "belum tersedia" in out
 
 
 class TestTampilan:
