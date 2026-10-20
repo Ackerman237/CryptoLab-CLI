@@ -237,7 +237,7 @@ def run_auto_analysis(
         # Check AES
         if "AES" in possible_keyed or is_potential_aes_hex(cleaned_input):
             try:
-                from .aes import aes_auto_analyze
+                from ..symmetric.aes import aes_auto_analyze
                 aes_results = aes_auto_analyze(cleaned_input, key=key, iv=iv)
                 for ar in aes_results:
                     if ar.technical_success:
@@ -273,7 +273,7 @@ def run_auto_analysis(
         # Check DES
         if "DES" in possible_keyed or is_potential_des_hex(cleaned_input):
             try:
-                from .des import des_auto_analyze
+                from ..symmetric.des import des_auto_analyze
 
                 des_results = des_auto_analyze(cleaned_input, key=key, iv=iv)
 
@@ -312,7 +312,7 @@ def run_auto_analysis(
         # candidates for the same hexadecimal ciphertext shape.
         if "RC2" in possible_keyed or is_potential_des_hex(cleaned_input):
             try:
-                from .rc2 import rc2_auto_analyze
+                from ..symmetric.rc2 import rc2_auto_analyze
 
                 rc2_results = rc2_auto_analyze(cleaned_input, key=key, iv=iv)
                 for rr in rc2_results:
