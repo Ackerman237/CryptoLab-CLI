@@ -1,7 +1,7 @@
 # Spec: Mode File (Enkripsi/Dekripsi/Hash Berkas)
 
 **Status:** DRAFT — label APPROVED dipasang **saat merge** (lihat §10)
-**Tanggal:** 2026-10-20 (revisi 6)
+**Tanggal:** 2026-10-20 (revisi 7)
 **Target:** `main` pasca-PR #3 (`abe1e4f`)
 **Prinsip:** 1 step = 1 commit · scope = spec ini saja · no behavior change untuk jalur teks (kecuali yang dinyatakan) · no new deps (stdlib only) · `core/` **tidak disentuh** kecuali penambahan field D11 (`raw_bytes` di `AesGcmResult`, §3.1)
 
@@ -17,6 +17,7 @@
 | 4 | Tegaskan **posisi field** D11 (Opsi B: sebelum `status_message`, jika tidak → `TypeError`); selaraskan §4 + prinsip kepala dokumen dengan pengecualian D11; tambah tes regresi `output_text`/`is_utf8`/`payload` + kasus kosong & 1 byte di F0b; tambah §6.3 (catatan snapshot parser: `COLUMNS`, versi Python, `-t`+`-f`). |
 | 5 | Perkuat bukti pemanggilan (§3.1): `git grep -rn "AesGcmResult(" -- src tests` (cakupan `src` **dan** `tests`), bukan regex lokal; catat batas bukti skrip (*dataclass tiruan*). Tes F0b pakai **konstanta** (bukan snapshot dinamis). Hapus item tes "cek via review kode" (tak eksekutabel; kasus `"deadbeef"` sudah menjaganya). Nyatakan status `verify_*.py` (bukan dikoleksi pytest). |
 | 6 | Rapikan sisa rev-3 di header/§3 (kini rev-6); hapus ambiguitas **F2 vs F3** di §6; koreksi panjang hex F0b (`os.urandom(64)` → **128** char, bukan 62+); catat hasil cek `pyproject.toml` (`python_files` tidak diubah → `verify_*.py` tetap tidak dikoleksi); tandai `verify_field_placement.py` sebagai bukti semantik saja, dilipat/hapus setelah F0b. |
+| 7 | Koreksi §6.3 butir 3: kasus `-t` + `-f` bersama **tidak mungkin** direkam di F0 (opsi `-f` belum ada → pesan saat ini `unrecognized arguments`). F0 merekam perilaku apa adanya; `-t` + `-f` + pembaruan snapshot dipindah ke F1. |
 
 **Verifikasi core (diminta reviewer):** dicek langsung, lihat §1.1, §1.2, dan
 `tests/file_mode/verify_core_bytes.py` (skrip pembuktian yang bisa dijalankan).
@@ -481,9 +482,17 @@ Snapshot `--help` dan teks galat argparse mudah rapuh. Aturan saat merekam:
    - **normalisasi** sebelum membandingkan (mis. samakan heading, lipat whitespace).
    Rekomendasi: normalisasi + tes yang hanya mengunci **substring stabil**
    (`is required`, `not allowed with argument`), bukan seluruh blok usage.
-3. **Wajib rekam kasus `-t` + `-f` bersama:** pesannya harus berbentuk
-   `argument -f/--file: not allowed with argument -t/--text`.
-4. Untuk tiap sub-perintah rekam: (a) tanpa `-t`/`-f`, (b) `--help`, (c) `-t` + `-f`.
+3. **Pembagian F0 vs F1 untuk kasus `-t` + `-f` bersama (koreksi rev-6 → rev-7):**
+   - **F0 merekam perilaku APA ADANYA pada kode yang belum berubah.** Karena `-f`
+     belum ada, `-t` + `-f` saat ini menghasilkan `unrecognized arguments: -f`.
+     Jadi F0 **tidak** merekam pesan `not allowed with argument` (tidak mungkin).
+     F0 merekam: (a) tanpa `-t`, (b) `--help`, (c) `-t` saja → **semua hijau**.
+   - **F1** menambahkan kasus `-t` + `-f` (pesan `argument -f/--file: not allowed with
+     argument -t/--text`) **dan** memperbarui secara sengaja snapshot "tanpa input"
+     serta baris usage. **Diff snapshot di commit F1 itulah dokumentasi perubahan**
+     yang disetujui di §5.0.
+4. Untuk tiap sub-perintah, F0 rekam: (a) tanpa `-t`, (b) `--help`, (c) `-t` saja.
+   Kasus `-t` + `-f` ditambahkan di F1 (lihat butir 3).
 
 ### 6.2 `hash --file` (perbaikan rev-2)
 
