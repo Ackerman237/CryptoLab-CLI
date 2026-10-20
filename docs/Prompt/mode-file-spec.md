@@ -491,9 +491,9 @@ write_output(path, data: bytes, force=False)
 |------|-----|-----|---------|
 | **F0** | Karakterisasi jalur `--text`, **teks galat argparse & `--help`**, `--format` parsing | `tests/test_file_mode.py` | Belum ada fitur menu. **Snapshot parser diperbarui sengaja** (§5.0) |
 | **F0b** | **D11**: selipkan `raw_bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor. ✅ **SELESAI** (rev-9) | `tests/test_file_mode.py::TestF0bAesGcmRawBytes` + `TestF0bRegresiGcm` | Satu-satunya sentuhan ke `core/` (§3.1). `aes.py` +3 baris |
-| **F1** | `cli/input.py` + `--file`/`--out`/`--force`/`--format` untuk **AES-GCM & AES-CBC** | §6.1 | Termasuk round-trip biner. **Dipecah F1a+F1b+F1c** (lihat di bawah) |
-| **F4** | Menu interaktif "Mode File" (+ Hash File) | snapshot menu | **PR terpisah** (lihat §12). ✅ **SELESAI** — lihat catatan di bawah |
-| **F5** | Docs: `docs/USAGE.md` + README (+ dokumentasi kontrak `hash -f`: `--encoding` diabaikan untuk `file`, `action` menang atas `-t`/`-f`) | — | Menyerap sisa F2 (lihat catatan rev-9) |
+| **F1** | `cli/input.py` + `--file`/`--out`/`--force`/`--format` untuk **AES-GCM & AES-CBC** | §6.1 | Termasuk round-trip biner. **Dipecah F1a+F1b+F1c** (lihat di bawah). ✅ **SELESAI** (`2871682`) |
+| **F4** | Menu interaktif "Mode File" (+ Hash File) | snapshot menu | **PR terpisah** (lihat §12). ✅ **SELESAI** (`42e71be`) — lihat catatan di bawah |
+| **F5** | Docs: `docs/USAGE.md` + README (+ dokumentasi kontrak `hash -f`: `--encoding` diabaikan untuk `file`, `action` menang atas `-t`/`-f`) | — | Menyerap sisa F2 (lihat catatan rev-9). ✅ **SELESAI** — lihat catatan di bawah |
 
 > **F2 & F3 dihapus (rev-9).**> - **F3 dihapus** atas keputusan reviewer: HMAC di luar scope awal
 >   ("enkripsi, dekripsi, hash berkas"). `hmac --file` bukan sekadar wiring —
@@ -508,6 +508,53 @@ write_output(path, data: bytes, force=False)
 
 > F0b ditulis sebelum F1 agar `cli/input.py` langsung memakai `raw_bytes` untuk
 > **kedua** algoritma — tidak perlu jalur sementara `is_utf8` sama sekali.
+
+> **Catatan F4 (SELESAI).** Item **"Mode File"** ditambahkan di tab **Simetris**
+> (`tab_menu.py`), handler `fn_mode_file` di `ctx_symmetric.py`. Handler memakai
+> **ULANG** helper `cli/input.py` — tidak ada logika I/O/format ganda. **"Hash File"
+> tidak diduplikasi**: jalur hash berkas sudah ada di `fn_sha3`/`fn_sha512` (opsi
+> "File" → `hash_file`), sesuai keputusan reviewer (pilihan A). 36 tes baru,
+> **718 passed, 6 skipped**, `core/` tidak disentuh.
+
+> **Catatan F5 (SELESAI).** `docs/USAGE.md` mendapat bagian **"Mode File"** (opsi,
+> batas 10 MB, aturan biner/raw, AEAD GCM vs CBC tanpa integritas) dan bagian
+> **"Hash berkas (`hash file` / `hash -f`)"** yang mendokumentasikan kontrak §1.3a
+> (`--encoding` diabaikan untuk `file`; sub-perintah menang atas `-t`/`-f`).
+> README diperbarui (tabel Fitur + perintah cepat). **Semua contoh dijalankan dulu**
+> di Windows sebelum ditulis (GCM/CBC hex/base64/raw, dekripsi ke berkas biner,
+> timpa `--force`, batas 10 MB, galat ramah, tamper GCM).
+
+#### Uji E2E manual Windows (penutup §6)
+
+Dijalankan lewat CLI nyata (subprocess) pada Windows: JPG (307 KB), PDF (51 KB),
+ZIP (96 KB), dan berkas tepat 10 MB — **semua round-trip identik (SHA-256 sama)**.
+
+| Kasus | Enkripsi (s) | Dekripsi (s) | Puncak RSS |
+|---|---|---|---|
+| JPG (GCM/hex) | 0.47 | 0.58 | ~4.3 MB |
+| PDF (GCM/base64) | 0.51 | 0.63 | ~4.5 MB |
+| ZIP (CBC/raw) | 0.47 | 0.47 | ~4.5 MB |
+| 10 MB (GCM/raw) | 0.55 | 0.65 | ~4.3 MB |
+| 10 MB (CBC/raw) | 0.54 | 0.85 | ~4.3 MB |
+
+Ukuran ciphertext tepat sesuai prediksi: GCM = plaintext + 28 B;
+CBC **raw** = plaintext + 32 B. Galat ramah & benar: berkas > 10 MB ditolak,
+berkas tidak ada, `--out` ada tanpa `--force`, `raw` tanpa `--out`, tamper GCM
+(autentikasi gagal), kunci salah GCM/CBC. Dekripsi teks UTF-8 ke stdout berfungsi.
+
+#### Sisa untuk fase 2 (belum dikerjakan)
+
+| Item | Alasan ditunda |
+|---|---|
+| **X1** Mode chunked/streaming | Butuh format ber-header antar-blok (read-all cukup untuk ≤10 MB) |
+| **X3** Format berkas ber-header (magic bytes/metadata) | Keputusan fase 2, bersama X1 |
+| **X4** Integritas otomatis AES-CBC | GCM sudah AEAD; CBC kini didokumentasikan sebagai tanpa integritas |
+| **X5** Kompresi sebelum enkripsi | Di luar scope |
+| **X2** Mode file untuk DES/RC2/RSA/klasik | Tidak AEAD / kunci pendek / lambat |
+| **X7** `hmac --file` | Butuh keputusan baru (format kunci, streaming, batas ukuran) |
+| Opsi "File" di `fn_hash` (Hashing & Password) | Jalur berkas sudah ada di `fn_sha3`/`fn_sha512`; hindari duplikasi |
+| Helper konfirmasi ya/tidak & pemilih berkas di `Ctx` | `flow.py` tidak disentuh; siasati dengan `ctx.choose` |
+
 
 **F1 = F1a + F1b + F1c (dipecah atas permintaan reviewer, rev-10).** Tiga commit
 terpisah agar bisa direview bertahap:
@@ -710,8 +757,8 @@ perintah; cakupan F1 = AES-GCM/CBC; F3 didefinisikan ulang. **D1–D11 tidak ber
 Rev-9: F3 dihapus (→ X7), F2 dihapus (→ F5), `hash`/`rsa` tidak disentuh parser.
 Urutan final **F0 → F0b → F1 → F4 → F5**. **D1–D11 tetap tidak berubah.**
 
-**Status dokumen:** **APPROVED (revisi 9)** — rev-8/9 adalah koreksi fakta (bukan
-perubahan keputusan desain) setelah F0; label APPROVED dari PR #4 tetap berlaku.
+**Status dokumen:** **IMPLEMENTED** — spec APPROVED (revisi 9) + koreksi rev-10; seluruh
+tahapan **F0 → F0b → F1 → F4 → F5 SELESAI**. Sisa item dipindahkan ke daftar fase 2 (§6).
 
 ---
 
