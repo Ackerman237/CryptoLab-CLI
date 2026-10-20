@@ -265,6 +265,11 @@ class TestWiringMenuTab:
     def test_generate_key_terwire(self):
         assert _items("Utilitas")["Generate Key"] is fn_keygen
 
+    def test_urutan_tab_utilitas(self):
+        """Urutan tab Utilitas: Auto Analyze, Generate Key, lalu Riwayat di bawah."""
+        labels = [label for label, _t, _tag in [g for name, g in CATEGORIES if name == "Utilitas"][0]]
+        assert labels == ["Auto Analyze", "Generate Key", "Riwayat"]
+
     def test_argon2_bcrypt_terwire_ke_fn_password(self):
         assert _items("Hash")["Argon2id / bcrypt"] is fn_password
 

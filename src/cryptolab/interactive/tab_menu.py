@@ -70,8 +70,8 @@ CATEGORIES = [
     ]),
     ("Utilitas", [
         ("Auto Analyze", fn_auto, ""),
-        ("Riwayat", fn_history, ""),
         ("Generate Key", fn_keygen, "baru"),
+        ("Riwayat", fn_history, ""),
     ]),
 ]
 
