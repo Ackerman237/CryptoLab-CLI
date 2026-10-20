@@ -3,7 +3,7 @@
 **Status:** DRAFT — APPROVED (revisi 3) saat merge
 **Tanggal:** 2026-10-20 (revisi 3)
 **Target:** `main` pasca-PR #3 (`abe1e4f`)
-**Prinsip:** 1 step = 1 commit · scope = spec ini saja · no behavior change untuk jalur teks (kecuali yang dinyatakan) · no new deps (stdlib only)
+**Prinsip:** 1 step = 1 commit · scope = spec ini saja · no behavior change untuk jalur teks (kecuali yang dinyatakan) · no new deps (stdlib only) · `core/` **tidak disentuh** kecuali penambahan field D11 (`raw_bytes` di `AesGcmResult`, §3.1)
 
 ---
 
@@ -14,6 +14,7 @@
 | 1 | Draf awal |
 | 2 | Menutup 4 celah wajib (dekripsi biner, batas ukuran per-format, konflik F2/X2/D5, `argparse` vs runtime) + 7 perbaikan; tambah `--format hex\|base64\|raw` (D3′); verifikasi signature core (§1.1). |
 | 3 | Koreksi klaim salah (§5.0: pesan argparse **memang berubah** → snapshot diperbarui sengaja); tambah **D11** (`raw_bytes` di `AesGcmResult`, opsi 1 disetujui) + tabel kasus GCM UTF-8/hex; geser status APPROVED ke saat merge. |
+| 4 | Tegaskan **posisi field** D11 (Opsi B: sebelum `status_message`, jika tidak → `TypeError`); selaraskan §4 + prinsip kepala dokumen dengan pengecualian D11; tambah tes regresi `output_text`/`is_utf8`/`payload` + kasus kosong & 1 byte di F0b; tambah §6.3 (catatan snapshot parser: `COLUMNS`, versi Python, `-t`+`-f`). |
 
 **Verifikasi core (diminta reviewer):** dicek langsung, lihat §1.1, §1.2, dan
 `tests/file_mode/verify_core_bytes.py` (skrip pembuktian yang bisa dijalankan).
@@ -158,10 +159,48 @@ non-UTF8. `bytes.fromhex()` pada kasus UTF-8 bisa **gagal** atau, lebih buruk,
 | Pemakai `output_text`/`is_utf8` | tetap berfungsi; field baru aditif |
 | Tes terdampak | tidak ada yang mengharapkan signature berubah |
 
-**Penyesuaian:** `raw_bytes` diletakkan setelah `is_utf8` sebagai field **berdefault**
-(agar konstruktor lain tidak wajib mengisinya) atau diisi eksplisit di kedua
-konstruktor — dipilih saat implementasi. Perubahan bersifat **aditif saja**; perilaku
-`output_text`/`is_utf8` tidak diubah.
+**Penyesuaian field — WAJIB, jika tidak `import` langsung gagal.** Struktur saat ini:
+
+```python
+@dataclass
+class AesGcmResult:
+    operation: str
+    key_repr: str
+    nonce_hex: str
+    payload: str
+    output_text: str
+    is_utf8: bool
+    technical_success: bool          # batas terakhir field TANPA default
+    status_message: str = ""         # <-- mulai ada default
+    reasons: List[str] = field(default_factory=list)
+```
+
+`raw_bytes: bytes` **tanpa default** tidak boleh ditaruh setelah `status_message`
+→ `TypeError: non-default argument 'raw_bytes' follows default argument`
+(diverifikasi: lihat `tests/file_mode/verify_field_placement.py`).
+
+**Pilihan (diputuskan): Opsi B — selipkan sebelum field berdefault**, sejajar dengan
+`AesResult` yang juga menaruh `raw_bytes` di antara field non-default:
+
+```python
+    technical_success: bool
+    raw_bytes: bytes                 # <-- di sini (non-default)
+    status_message: str = ""
+    reasons: List[str] = field(default_factory=list)
+```
+
+Alasan: menyamakan posisi dengan `AesResult`, dan tidak menciptakan default palsu
+`b""` yang bisa menyembunyikan lupa-isi. Kedua konstruktor (`aes.py:407` encrypt,
+`aes.py:488` decrypt) memakai **keyword** (diverifikasi), jadi penempatan baru ini
+**tidak** menggeser pemanggilan yang ada. Keduanya **wajib** menambahkan
+`raw_bytes=...` (encrypt → `ct_bytes`; decrypt → `pt_bytes`).
+
+> Alternatif bila ingin tanpa menyentuh urutan: Opsi C — `raw_bytes: bytes = b""`
+> di paling belakang. Tidak dipilih karena default kosong menutupi lupa-isi.
+
+**Penyesuaian:** `raw_bytes` diletakkan sebelum `status_message` (Opsi B). Perubahan
+bersifat **aditif saja**; perilaku `output_text`/`is_utf8` tidak diubah dan harus
+dibuktikan tidak berubah (tes regresi F0b).
 
 **Pengecualian tertulis "core beku":** D11 adalah satu-satunya perubahan yang diizinkan
 menyentuh `core/symmetric/aes.py`, dan hanya penambahan field. Logika kripto
@@ -180,17 +219,18 @@ disetujui** karena menyamakan asimetri dan mencegah kelas bug §1.2.
 |--------|-----------|
 | `src/cryptolab/cli/parser.py` | Ganti `required=True` pada `-t` dengan `add_mutually_exclusive_group(required=True)`; tambah `-f`, `-o`, `--force`, `--format` |
 | `src/cryptolab/cli/input.py` **(baru)** | `read_input`, `read_file_bytes`, `write_output`, konversi format, `payload` CBC/GCM |
-| `src/cryptolab/core/symmetric/aes.py` | **Hanya D11**: tambah field `raw_bytes` ke `AesGcmResult` + isi di 2 konstruktor. Tidak ada perubahan logika kripto. |
+| `src/cryptolab/core/symmetric/aes.py` | **HANYA D11**: selipkan field `raw_bytes: bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor (`:407`, `:488`). Tidak ada perubahan logika kripto, `output_text`, atau `is_utf8`. |
 | `src/cryptolab/cli/commands/symmetric.py` | Pakai `cli/input.py`; jalur `--text` tetap identik |
 | `src/cryptolab/cli/commands/hashing.py` | `hash --file` → **`hash_file()` langsung** (bukan `read_input`) |
 | `src/cryptolab/interactive/handlers/ctx_symmetric.py` | Handler "Mode File" |
 | `src/cryptolab/interactive/handlers/ctx_hashing.py` | Handler "Hash File" |
 | `src/cryptolab/interactive/tab_menu.py` | Item baru di `CATEGORIES` |
 | `tests/test_file_mode.py` **(baru)** | Karakterisasi + round-trip + batas + galat (lihat §6) |
-| `tests/test_tahap3_modes.py` | Tambah tes GCM: UTF-8 biasa, `"deadbeef"`, `os.urandom`, dan `raw_bytes` == asli |
+| `tests/test_tahap3_modes.py` | Tambah tes GCM: UTF-8 biasa, `"deadbeef"`, `os.urandom`, kosong, 1 byte, regresi `output_text`/`is_utf8`, dan `raw_bytes` == asli |
 
-**Tidak disentuh:** `core/hashing.py`, `core/encoding/*.py`, dan seluruh
-`core/symmetric/*` **kecuali** penambahan field D11 di `aes.py`.
+**Tidak disentuh:** `core/hashing.py` dan `core/encoding/*.py`.
+`core/symmetric/*.py` **hanya** `aes.py` untuk penambahan field D11 (§3.1) —
+`des.py`, `rc2.py`, dan `__init__.py` tidak disentuh.
 
 ---
 
@@ -338,7 +378,7 @@ write_output(path, data: bytes, force=False)
 | Step | Isi | Tes | Catatan |
 |------|-----|-----|---------|
 | **F0** | Karakterisasi jalur `--text`, **teks galat argparse & `--help`**, `--format` parsing | `tests/test_file_mode.py` | Belum ada fitur menu. **Snapshot parser diperbarui sengaja** (§5.0) |
-| **F0b** | **D11**: tambah `raw_bytes` ke `AesGcmResult` + isi di 2 konstruktor | `tests/test_tahap3_modes.py` (kasus §6.1 GCM) | Satu-satunya sentuhan ke `core/` (§3.1) |
+| **F0b** | **D11**: selipkan `raw_bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor | `tests/test_tahap3_modes.py` (kasus §6.1 GCM + regresi `output_text`/`is_utf8`/`payload`) | Satu-satunya sentuhan ke `core/` (§3.1) |
 | **F1** | `cli/input.py` + `--file`/`--out`/`--force`/`--format` untuk **AES-GCM & AES-CBC** | §6.1 | Termasuk round-trip biner |
 | **F2** | Perluas ke perintah lain (hashing) + dokumentasi `--format` | — | **Tanpa DES/RC2** (X2) |
 | **F3** | `hash --file` → `hash_file` **langsung** | hash berkas besar (>10 MB) lolos | Lihat §6.2 |
@@ -371,9 +411,36 @@ write_output(path, data: bytes, force=False)
 - [ ] GCM plaintext `"deadbeef"` (UTF-8 **dan** hex valid) → round-trip byte ==
       `b"deadbeef"` (**bukan** `b'\xde\xad\xbe\xef'`)
 - [ ] GCM plaintext `os.urandom(64)` (non-UTF8) → round-trip byte == asli
-- [ ] `AesGcmResult.raw_bytes` == plaintext asli untuk **ketiga** kasus
+- [ ] GCM plaintext **kosong** (`b""`) → `raw_bytes == b""`
+- [ ] GCM plaintext **1 byte** (`b"A"` dan 1 byte non-UTF8 `b"\xff"`) → `raw_bytes` == asli
+- [ ] `AesGcmResult.raw_bytes` == plaintext asli untuk **semua** kasus di atas
 - [ ] Dekripsi GCM **tidak** memanggil `bytes.fromhex(output_text)` (cek via review kode
       atau tes yang menggagalkan bila `output_text` dijadikan sumber)
+
+**Tes regresi F0b (perilaku lama tidak boleh berubah):**
+
+- [ ] `output_text` dan `is_utf8` **identik** sebelum & sesudah D11 untuk ketiga kasus
+      asli (`"halo"` → `'halo'`/`True`; `"deadbeef"` → `'deadbeef'`/`True`;
+      `os.urandom` → hex/`False`). Snapshot nilai sebelum perubahan direkam dulu.
+- [ ] `aes_gcm_encrypt(...).payload` **identik** formatnya (masih `nonce:ct:tag` hex)
+- [ ] `tests/test_tahap3_modes.py` lama **tetap hijau tanpa diubah** (selain penambahan tes)
+- [ ] `import cryptolab` dan `AesGcmResult(...)` **tidak** TypeError (verifikasi posisi field §3.1)
+
+### 6.3 Catatan penting untuk F0 (snapshot parser — rapuh)
+
+Snapshot `--help` dan teks galat argparse mudah rapuh. Aturan saat merekam:
+
+1. **Lebar terminal:** set `COLUMNS=80` (atau nilai tetap) di fixture sebelum memanggil
+   `--help`. Tanpa itu, lebar baris usage bergantung pada ukuran terminal.
+2. **Versi Python:** format pesan argparse dapat berbeda antar versi (mis. heading
+   `options:` vs `optional arguments:` yang berubah di 3.10). Pilih salah satu:
+   - catat versi Python (mis. 3.12.10) dan pakai `requires-python` minimum sebagai acuan, atau
+   - **normalisasi** sebelum membandingkan (mis. samakan heading, lipat whitespace).
+   Rekomendasi: normalisasi + tes yang hanya mengunci **substring stabil**
+   (`is required`, `not allowed with argument`), bukan seluruh blok usage.
+3. **Wajib rekam kasus `-t` + `-f` bersama:** pesannya harus berbentuk
+   `argument -f/--file: not allowed with argument -t/--text`.
+4. Untuk tiap sub-perintah rekam: (a) tanpa `-t`/`-f`, (b) `--help`, (c) `-t` + `-f`.
 
 ### 6.2 `hash --file` (perbaikan rev-2)
 
