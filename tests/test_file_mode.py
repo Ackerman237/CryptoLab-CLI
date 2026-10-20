@@ -302,6 +302,9 @@ class TestF0FileState:
     with ``-t`` yet, and other sub-commands have no ``-f`` at all. F1 must
     account for this existing, partially-wired option instead of assuming a
     clean slate.
+
+    The behaviour below (streaming, error text, encoding ignored, action wins)
+    is a contract users already rely on. F1/F2 must not change it silently.
     """
 
     def test_hash_file_sudah_ada(self):
@@ -328,3 +331,90 @@ class TestF0FileState:
         code, _, err = run_cli("caesar", "encrypt", "-t", "HI", "-f", "x.txt")
         assert code == 2
         assert "unrecognized arguments" in err
+
+
+class TestF0HashFileKontrak:
+    """Precise contract of the EXISTING `hash -f` (locked before F1 touches it).
+
+    Verified against src/cryptolab/cli/commands/hashing.py (handle_hash) and
+    src/cryptolab/core/hashing.py (hash_file). All facts empirically confirmed.
+    """
+
+    def test_hash_file_streaming_bukan_read_all(self, tmp_path):
+        """`hash -f` uses hash_file() -> 8 KB streaming, works on large files.
+
+        Proof: a 20 KB file (larger than one chunk) hashes to the correct digest,
+        and hash_file reads in ``iter(lambda: f.read(8192), b"")`` (hashing.py:186).
+        """
+        import hashlib
+
+        besar = tmp_path / "besar.bin"
+        besar.write_bytes(b"A" * 20000)
+        code, out, _ = run_cli("hash", "file", "-f", str(besar))
+        assert code == 0
+        assert hashlib.sha256(b"A" * 20000).hexdigest() in out
+
+    def test_hash_file_digest_benar(self, tmp_path):
+        import hashlib
+
+        f = tmp_path / "uji.txt"
+        f.write_bytes(b"Hello")
+        code, out, _ = run_cli("hash", "file", "-f", str(f))
+        assert code == 0
+        assert hashlib.sha256(b"Hello").hexdigest() in out
+
+    def test_hash_file_berkas_tidak_ada_galat_exit_1(self, tmp_path):
+        """Missing file -> handler error "Gagal membaca file" on stderr, exit 1."""
+        code, _, err = run_cli("hash", "file", "-f", str(tmp_path / "nope.txt"))
+        assert code == 1
+        assert "Gagal membaca file" in err
+
+    def test_hash_file_direktori_galat_exit_1(self, tmp_path):
+        """A directory -> OSError wrapped as "Gagal membaca file", exit 1."""
+        code, _, err = run_cli("hash", "file", "-f", str(tmp_path))
+        assert code == 1
+        assert "Gagal membaca file" in err
+
+    def test_hash_file_encoding_diabaikan(self, tmp_path):
+        """`--encoding` has NO effect on the `file` action (output stays hex).
+
+        Contrast with `compute`, which DOES honour `--encoding` (see below).
+        """
+        f = tmp_path / "uji.txt"
+        f.write_bytes(b"Hello")
+        _, out_hex, _ = run_cli("hash", "file", "-f", str(f))
+        _, out_b64, _ = run_cli("hash", "file", "-f", str(f), "--encoding", "base64")
+        assert out_hex.strip() == out_b64.strip()
+
+    def test_hash_compute_encoding_dihormati(self):
+        """`compute` DOES honour `--encoding` — the counterpart to `file`."""
+        import hashlib
+
+        digest_hex = hashlib.sha256(b"Hi").hexdigest()
+        _, out_hex, _ = run_cli("hash", "compute", "-t", "Hi")
+        _, out_b64, _ = run_cli("hash", "compute", "-t", "Hi", "--encoding", "base64")
+        assert digest_hex in out_hex
+        assert digest_hex not in out_b64
+
+    def test_hash_action_menang_atas_input_lain(self, tmp_path):
+        """When `-t` and `-f` are both given, `action` decides which is used."""
+        import hashlib
+
+        f = tmp_path / "uji.txt"
+        f.write_bytes(b"Hello")
+
+        # action=compute -> hashes the TEXT, ignores -f.
+        code, out_c, _ = run_cli("hash", "compute", "-t", "Hello", "-f", str(f))
+        assert code == 0
+        assert hashlib.sha256(b"Hello").hexdigest() in out_c
+
+        # action=file -> hashes the FILE, ignores -t.
+        code, out_f, _ = run_cli("hash", "file", "-t", "Hello", "-f", str(f))
+        assert code == 0
+        assert hashlib.sha256(b"Hello").hexdigest() in out_f
+
+    def test_hash_compute_tanpa_text_galat_handler(self):
+        """`hash compute` without `-t` fails in the HANDLER (exit 1), not argparse."""
+        code, _, err = run_cli("hash", "compute")
+        assert code == 1
+        assert "memerlukan parameter --text" in err
