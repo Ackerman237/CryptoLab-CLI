@@ -13,6 +13,97 @@ from cryptolab.ui import (
 )
 
 
+# ============================================================
+# read_key dengan timeout
+# ============================================================
+
+def read_key(timeout: Optional[float] = None):
+    """Baca satu tombol dengan optional timeout.
+
+    Mengembalikan nama tombol yang dinormalisasi:
+    ``"up"``, ``"down"``, ``"left"``, ``"right"``, ``"pgup"``, ``"pgdn"``,
+    ``"home"``, ``"end"``, ``"enter"``, ``"esc"``, atau satu karakter
+    (mis. ``"q"``, ``"r"``). Mengembalikan ``None`` bila timeout habis.
+
+    Di Windows memakai ``msvcrt.kbhit()`` + polling; di POSIX memakai
+    ``select.select()``. Sesuaikan dengan readchar yang sudah dipakai menu.
+    """
+    import time
+
+    if timeout is None:
+        # Mode blocking: pakai readchar.readkey() langsung lalu normalisasi.
+        try:
+            k = readchar.readkey()
+        except (KeyboardInterrupt, EOFError):
+            return "esc"
+        return _normalize_key(k)
+
+    # Mode timeout: polling dengan interval kecil.
+    deadline = time.time() + timeout
+    is_windows = sys.platform == "win32"
+
+    if is_windows:
+        import msvcrt
+        while time.time() < deadline:
+            if msvcrt.kbhit():
+                try:
+                    k = readchar.readkey()
+                except (KeyboardInterrupt, EOFError):
+                    return "esc"
+                return _normalize_key(k)
+            time.sleep(0.02)
+        return None
+    else:
+        # POSIX: pakai select pada stdin
+        import select
+        fd = sys.stdin.fileno()
+        while time.time() < deadline:
+            remaining = max(deadline - time.time(), 0)
+            rlist, _, _ = select.select([fd], [], [], remaining)
+            if rlist:
+                try:
+                    k = readchar.readkey()
+                except (KeyboardInterrupt, EOFError):
+                    return "esc"
+                return _normalize_key(k)
+            time.sleep(0.02)
+        return None
+
+
+def _normalize_key(k: str) -> str:
+    """Normalisasi output readchar.readkey() menjadi nama tombol yang konsisten."""
+    home_key = getattr(readchar_key, "HOME", "\x1b[H")
+    end_key = getattr(readchar_key, "END", "\x1b[F")
+    esc_key = getattr(readchar_key, "ESC", "\x1b")
+    pgup_key = getattr(readchar_key, "PAGE_UP", "\x1b[5~")
+    pgdn_key = getattr(readchar_key, "PAGE_DOWN", "\x1b[6~")
+    left_key = getattr(readchar_key, "LEFT", "\x1b[D")
+    right_key = getattr(readchar_key, "RIGHT", "\x1b[C")
+
+    if k == readchar_key.UP:
+        return "up"
+    if k == readchar_key.DOWN:
+        return "down"
+    if k == left_key:
+        return "left"
+    if k == right_key:
+        return "right"
+    if k == home_key:
+        return "home"
+    if k == end_key:
+        return "end"
+    if k == pgup_key:
+        return "pgup"
+    if k == pgdn_key:
+        return "pgdn"
+    if k in (readchar_key.ENTER, '\r', '\n'):
+        return "enter"
+    if k == esc_key:
+        return "esc"
+    # Karakter tunggal (q, r, dll.)
+    return k.lower() if len(k) == 1 else k
+
+
 class BackToMenu(Exception):
     """Raised when user chooses to navigate back to the previous menu."""
     pass

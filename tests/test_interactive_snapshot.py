@@ -34,7 +34,7 @@ class TestInteractiveRendering:
     def test_render_header(self):
         """Test header rendering."""
         output = render_header(HEADER_SUBTITLE, max_logo_rows=10)
-        assert "CRYPTOLAB CLI v0.1.0" in output
+        assert "CRYPTOLAB CLI v1.2.0" in output
         assert "TOOLKIT KRIPTOGRAFI" in output
         # Header should have logo + subtitle
         lines = output.split("\n")
@@ -106,7 +106,7 @@ class TestInteractiveRendering:
         # Should have: header (logo + subtitle) + blank + title + blank + menu body + blank + footer
         header_end = -1
         for i, line in enumerate(lines):
-            if "CRYPTOLAB CLI v0.1.0" in line:
+            if "CRYPTOLAB CLI v1.2.0" in line:
                 header_end = i
                 break
         assert header_end >= 0

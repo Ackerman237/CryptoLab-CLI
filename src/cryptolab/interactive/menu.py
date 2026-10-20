@@ -1,5 +1,6 @@
 """Interactive main menu definition."""
 
+from cryptolab.banner import HEADER_SUBTITLE
 from cryptolab.ui import Menu
 from cryptolab.interactive.handlers import (
     handle_auto_analyze,
@@ -50,8 +51,6 @@ MAIN_MENU_HANDLERS = [
     handle_binary,
     handle_history,
 ]
-
-HEADER_SUBTITLE = "CRYPTOLAB CLI v1.0.0 · TOOLKIT KRIPTOGRAFI & ENCODING"
 
 
 def get_main_menu_labels() -> list:

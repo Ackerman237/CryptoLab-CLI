@@ -255,7 +255,7 @@ class TestCLISnapshots:
             return
         
         # For RSA, the ciphertext changes with each keypair, so only check structure
-        assert "CRYPTOLAB CLI v1.0.0 - HASIL RSA ENKRIPSI" in normalized
+        assert "CRYPTOLAB CLI v1.2.0 - HASIL RSA ENKRIPSI" in normalized
         assert "RSA-PKCS1v15 (ENCRYPT)" in normalized
         assert "Algorithm   : RSA-PKCS1v15" in normalized
         assert "Key Size    : 2048 bit" in normalized

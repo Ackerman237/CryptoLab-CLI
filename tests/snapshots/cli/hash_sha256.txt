@@ -1,5 +1,5 @@
 ======================================================================
-  CRYPTOLAB CLI v1.0.0 - HASIL HASH SHA256
+  CRYPTOLAB CLI v1.2.0 - HASIL HASH SHA256
 ======================================================================
   Operasi     : SHA256 Hash (COMPUTE)
   Algorithm   : SHA256

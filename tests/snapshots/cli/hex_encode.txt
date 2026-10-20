@@ -1,5 +1,5 @@
 ======================================================================
-  CRYPTOLAB CLI v1.0.0 - HASIL HEX
+  CRYPTOLAB CLI v1.2.0 - HASIL HEX
 ======================================================================
   Operasi     : Hexadecimal (ENCODE)
   Delimiter   : ' '

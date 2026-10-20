@@ -71,7 +71,12 @@ def handle_cli_args(args) -> int:
     """Execute direct CLI commands based on parsed arguments."""
     from cryptolab.exceptions import CryptoLabError
     from cryptolab.cli.formatters import render_error
+    from cryptolab.interactive import run_interactive_menu
     import sys
+
+    if args.command is None or args.command == "menu":
+        run_interactive_menu()
+        return 0
 
     command_handlers = {
         "caesar": handle_caesar,
@@ -98,7 +103,6 @@ def handle_cli_args(args) -> int:
         "random": handle_random,
         "rsa": handle_rsa,
         "dh": handle_dh,
-        "menu": lambda args: 0,  # handled in main
     }
 
     handler = command_handlers.get(args.command)

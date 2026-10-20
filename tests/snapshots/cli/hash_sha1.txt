@@ -1,6 +1,6 @@
 PERINGATAN: SHA-1 adalah hash lemah (collision attacks praktis). JANGAN gunakan untuk keamanan.
 ======================================================================
-  CRYPTOLAB CLI v1.0.0 - HASIL HASH SHA1
+  CRYPTOLAB CLI v1.2.0 - HASIL HASH SHA1
 ======================================================================
   Operasi     : SHA1 Hash (COMPUTE)
   Algorithm   : SHA1

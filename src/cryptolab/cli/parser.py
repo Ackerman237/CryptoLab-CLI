@@ -3,6 +3,7 @@
 import argparse
 from typing import List
 
+from cryptolab import __version__
 from cryptolab.core.hashing import BCRYPT_AVAILABLE
 
 
@@ -13,7 +14,7 @@ def create_parser() -> argparse.ArgumentParser:
         description="CryptoLab CLI - Toolkit Kriptografi Klasik & Encoding untuk Praktikum Keamanan Informasi",
     )
     parser.add_argument(
-        "-v", "--version", action="version", version="%(prog)s 1.0.0"
+        "-v", "--version", action="version", version=f"%(prog)s {__version__}"
     )
     parser.add_argument(
         "--no-history",
@@ -21,7 +22,7 @@ def create_parser() -> argparse.ArgumentParser:
         help="Nonaktifkan pencatatan riwayat operasi ke file lokal",
     )
 
-    subparsers = parser.add_subparsers(dest="command", help="Perintah yang tersedia")
+    subparsers = parser.add_subparsers(dest="command", help="Perintah yang tersedia", required=False)
 
     # Interactive menu
     subparsers.add_parser("menu", help="Buka antarmuka menu interaktif")

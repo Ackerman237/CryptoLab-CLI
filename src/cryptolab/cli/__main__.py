@@ -11,7 +11,8 @@ def main() -> int:
     args = parser.parse_args()
 
     # If no command provided (None, empty string, or "menu"), enter interactive menu
-    if not args.command or args.command == "menu":
+    command = getattr(args, 'command', None)
+    if not command or command == "menu":
         run_interactive_menu()
         return 0
 

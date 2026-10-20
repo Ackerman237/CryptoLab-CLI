@@ -1,5 +1,5 @@
 ======================================================================
-  CRYPTOLAB CLI v1.0.0 - HASIL RSA ENKRIPSI
+  CRYPTOLAB CLI v1.2.0 - HASIL RSA ENKRIPSI
 ======================================================================
   Operasi     : RSA-RSA-PKCS1v15 (ENCRYPT)
   Algorithm   : RSA-PKCS1v15

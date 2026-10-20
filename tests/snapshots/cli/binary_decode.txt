@@ -1,5 +1,5 @@
 ======================================================================
-  CRYPTOLAB CLI v1.0.0 - HASIL BINARY
+  CRYPTOLAB CLI v1.2.0 - HASIL BINARY
 ======================================================================
   Operasi     : Binary 8-Bit (DECODE)
   Status      : BERHASIL (OK)

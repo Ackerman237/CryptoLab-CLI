@@ -1,8 +1,25 @@
-"""Banner and terminal utilities for CryptoLab UI."""
+"""Banner and terminal utilities for CryptoLab UI.
 
+Per padanan panduan 'PROMPT_rombak_ui_cryptolab.md' bagian 6.1:
+- ``vlen`` menghitung panjang terlihat (tanpa kode ANSI).
+- ``center_block`` memusatkan blok logo SEBAGAI SATU BLOK (padding sama untuk
+  semua baris), bukan memusatkan tiap baris sendiri-sendiri.
+- ``pick_logo`` memilih logo terbesar yang muat di lebar DAN tinggi.
+- ``render_header`` mengembalikan header dengan logo + subtitle terpusat.
+- Konstanta ``APP_VERSION`` dan ``HEADER_SUBTITLE`` adalah satu sumber kebenaran.
+"""
+
+import re
 import shutil
 import sys
 from typing import Optional
+
+# ============================================================
+# Versi aplikasi (satu sumber kebenaran)
+# ============================================================
+# Dipilih dari pyproject.toml (= 1.2.0) dan src/cryptolab/__init__.py (= 1.2.0).
+APP_VERSION = "1.2.0"
+HEADER_SUBTITLE = f"CRYPTOLAB CLI v{APP_VERSION} · TOOLKIT KRIPTOGRAFI & ENCODING"
 
 # ============================================================
 # Logo definitions (SVG-style block pixel font - CRYPTOLAB)
@@ -39,6 +56,9 @@ LOGO_TINY = "CRYPTOLAB"
 # ============================================================
 # Color constants
 # ============================================================
+# Regex untuk melucuti kode ANSI saat menghitung panjang terlihat.
+_ANSI = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
+
 RESET = "\033[0m"
 BOLD = "\033[1m"
 DIM = "\033[2m"
@@ -55,6 +75,11 @@ def paint(text: str, style: str = "") -> str:
     return f"{style}{text}{RESET}"
 
 
+def vlen(s: str) -> int:
+    """Panjang teks yang terlihat (tanpa kode ANSI)."""
+    return len(_ANSI.sub("", s))
+
+
 def term_width(default: int = 80) -> int:
     """Get terminal width."""
     return shutil.get_terminal_size((default, 24)).columns
@@ -66,14 +91,21 @@ def term_height(default: int = 24) -> int:
 
 
 def _block_width(text: str) -> int:
-    """Get max line width of a multi-line string."""
-    return max(len(line) for line in text.splitlines())
+    """Get max *visible* line width of a multi-line string (ANSI stripped)."""
+    return max((vlen(line) for line in text.splitlines()), default=0)
 
 
 def center_block(text: str, width: int, offset: int = 0) -> str:
-    """Center a multi-line block within width, with optional offset."""
+    """Pusatkan blok logo SEBAGAI SATU BLOK.
+
+    Semua baris diberi padding yang sama (berdasarkan lebar blok terlihat),
+    sehingga tepi kiri semua baris sejajar. Ini menggantikan centering per
+    baris yang menyebabkan logo tampak miring/asimetris.
+    """
     lines = text.splitlines()
-    return "\n".join(line.center(width) for line in lines)
+    bw = max((vlen(l) for l in lines), default=0)
+    pad = " " * max((width - bw) // 2, 0)
+    return "\n".join(pad + l.ljust(bw) for l in lines)
 
 
 def pick_logo(width: int, max_rows: int = 99) -> str:
@@ -85,13 +117,18 @@ def pick_logo(width: int, max_rows: int = 99) -> str:
 
 
 def render_header(subtitle: str = "", max_logo_rows: int = 99) -> str:
-    """Render header with logo, blank line, and subtitle."""
+    """Render header with logo, blank line, and subtitle.
+
+    Garis pemisah tidak dicetak di sini; garisnya cukup di footer agar header
+    tetap ringkas dan ruang hasil lebih luas.
+    """
     w = term_width()
     logo = paint(center_block(pick_logo(w, max_logo_rows), w), WHITE)
     if subtitle:
-        if len(subtitle) > w:
+        if vlen(subtitle) > w:
+            # terlalu lebar: buang bagian setelah " · "
             subtitle = subtitle.split(" · ")[0]
-        if len(subtitle) > w:
+        if vlen(subtitle) > w:
             subtitle = subtitle[: max(w - 1, 0)] + "…"
         sub = paint(subtitle.center(w), DIM)
         return "\n".join(["", logo, "", sub])
@@ -99,28 +136,33 @@ def render_header(subtitle: str = "", max_logo_rows: int = 99) -> str:
 
 
 def _fit_hints(hints, width: int, gap: int = 3):
-    """Fit hints to terminal width by dropping from end."""
+    """Fit hints to terminal width by dropping from end. Uses vlen for accuracy."""
     chosen = list(hints)
     while chosen:
-        if len((" " * gap).join(f"{k} {l}" for k, l in chosen)) <= width - 2:
+        plain = (" " * gap).join(f"{k} {l}" for k, l in chosen)
+        if vlen(plain) <= width - 2:
             return chosen
         chosen.pop()
     return []
 
 
 def render_footer(hints, gap: int = 3) -> str:
-    """Render footer with thin rule and centered hints."""
+    """Render footer with thin rule and centered hints.
+
+    Menggunakan vlen() untuk menghitung panjang teks plain (tanpa ANSI) agar
+    garis dan hint selalu sejajar di tengah.
+    """
     w = term_width()
     chosen = _fit_hints(hints, w, gap)
     plain = (" " * gap).join(f"{k} {l}" for k, l in chosen)
     styled = (" " * gap).join(f"{paint(k, BOLD + WHITE)} {paint(l, DIM)}" for k, l in chosen)
     rule = paint(" " * 2 + "─" * max(w - 4, 0), DIM)
-    return rule + "\n" + " " * max((w - len(plain)) // 2, 0) + styled
+    return rule + "\n" + " " * max((w - vlen(plain)) // 2, 0) + styled
 
 
 def _clip(text: str, width: int) -> str:
-    """Clip text to width with ellipsis."""
-    return text if len(text) <= width else text[: max(width - 1, 0)] + "…"
+    """Clip text to visible width with ellipsis."""
+    return text if vlen(text) <= width else text[: max(width - 1, 0)] + "…"
 
 
 # ============================================================

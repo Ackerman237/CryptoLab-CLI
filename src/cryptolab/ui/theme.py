@@ -1,8 +1,17 @@
 """Design tokens for CryptoLab UI - Single Source of Truth for colors, symbols, spacing."""
 
 import os
+import re
 import sys
 from typing import Optional
+
+# Regex untuk melucuti kode ANSI saat menghitung panjang terlihat.
+_ANSI = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
+
+
+def vlen(s: str) -> int:
+    """Panjang teks yang terlihat (tanpa kode ANSI)."""
+    return len(_ANSI.sub("", s))
 
 
 class Color:
@@ -229,29 +238,44 @@ class Width:
 # Logo definitions (progressive sizes - block style)
 # ============================================================
 
-# Unicode logos
+# Large block-style CRYPTOLAB logo (5 lines) - matches banner.py
 _LOGO_LARGE_UNI = """\
-▄▀▀▀▀ █▀▀▀▄ █   █ █▀▀▀▄ ▀▀█▀▀ ▄▀▀▀▄ █     ▄▀▀▀▄ █▀▀▀▄
-█     █▀▀█   ▀▄▀  █▀▀▀    █   █   █ █     █▀▀▀█ █▀▀▀▄
-▀▀▀▀ ▀   ▀   ▀   ▀       ▀    ▀▀▀  ▀▀▀▀▀ ▀   ▀ ▀▀▀▀"""
+██████  ██████  ██    ██ ██████  ████████  ██████  ██       █████  ██████
+██      ██   ██  ██  ██  ██   ██ ██    ██ ██   ██ ██      ██   ██ ██   ██
+██      ██████    ████   ██████  ██    ██ ██████  ██      ███████ ██████
+██      ██   ██    ██    ██      ██    ██ ██   ██ ██      ██   ██ ██   ██
+ ██████ ██   ██    ██    ██      ██     ██████  ███████ ██   ██ ██   ██"""
 
+# Medium block-style logo (3 lines) - condensed version
 _LOGO_MEDIUM_UNI = """\
-▄▀▀▀▀ █▀▀▀▄ █   █ █▀▀▀▄
-█     █▀▀█   ▀▄▀  █▀▀▀
-▀▀▀▀ ▀   ▀   ▀   ▀"""
+██████ ██████ ██  ██ ██████ ████████ ██████ ██    █████ ██████
+██     ██  ██ ██ ██  ██  ██ ██    ██ ██     ██   ██ ██   ██
+██     ██████ ████   ██████ ██    ██ █████  ██   ███████ ██████
+██     ██  ██ ██ ██  ██     ██    ██ ██     ██   ██ ██   ██
+ ██████ ██  ██ ██  ██ ██     ██     ██████ ███████ ██ ██   ██"""
 
-# ASCII fallbacks
+# Small logo for very narrow terminals
+_LOGO_SMALL_UNI = """\
+██████ ██████ ██████ ██    ██ ███████ ██████
+██     ██  ██ ██   ██ ██  ██ ██      ██   ██
+█████  ██████ ██████ ██████ █████   ██████
+██     ██  ██ ██   ██ ██ ██ ██      ██   ██
+██████ ██  ██ ██      ████  ███████ ██   ██"""
+
+# ASCII fallback matching the geometric shape of the SVG logo.
 _LOGO_LARGE_ASCII = """\
-+--------+ +--------+ +---+ +---+ +--------+ +---+ +--------+ +---+ +--------+ +---+
-|        | |        | |   | | |        | +---+ |        | |   | | |     |        | |
-+--------+ +--------+ +---+ +---+ +--------+ +---+ +--------+ +---+ +--------+ +---+
-"""
+  ####  ####  ####  ####  ####  ####  ####  ####  ####
+ #      #      #  #  #      #      #  #  #  #  #      #
+ #      ####   ####  ####   #      ####  #  #  ####   #
+ #      #      # #   #      #      #  #  #  #  #      #
+  ####  ####  #  #  ####    ####  #  #  #  #  ####   #"""
 
 _LOGO_MEDIUM_ASCII = """\
-+--------+ +--------+ +---+ +---+ +--------+
-|        | |        | |   | | |        |   |
-+--------+ +--------+ +---+ +---+ +--------+
-"""
+ #### #### #  # #### ###### ####  #   #### ####
+ #    #  # # # #  #   #   #  # # # #     #  #
+ ####  #### ####   ####   ####  #  #  ###  ####
+ #    #  # # # #  #   #   #  # # # #     #  #
+ #### #  # #  # ####    ####  #   #### #  #"""
 
 LOGO_TINY = "CRYPTOLAB"
 
@@ -347,42 +371,49 @@ class Style:
 
 
 def _block_width(text: str) -> int:
-    """Get max line width of a multi-line string."""
-    return max(len(line) for line in text.splitlines())
+    """Get max *visible* line width of a multi-line string (ANSI stripped)."""
+    return max((vlen(line) for line in text.splitlines()), default=0)
 
 
 def center_block(text: str, width: int, offset: int = 0) -> str:
-    """Center a multi-line block within width, with optional offset."""
+    """Center a multi-line block as ONE BLOCK (padding same for all lines).
+
+    Semua baris diberi padding yang sama berdasarkan lebar blok terlihat,
+    sehingga tepi kiri semua baris sejajar.
+    """
     lines = text.splitlines()
-    return "\n".join(line.center(width + offset) for line in lines)
+    bw = max((vlen(l) for l in lines), default=0)
+    pad = " " * max((width - bw) // 2, 0)
+    return "\n".join(pad + l.ljust(bw) for l in lines)
 
 
 def clip_text(text: str, width: int) -> str:
-    """Clip text to width with ellipsis."""
-    return text if len(text) <= width else text[: max(width - 1, 0)] + Symbol.ELLIPSIS
+    """Clip text to visible width with ellipsis."""
+    return text if vlen(text) <= width else text[: max(width - 1, 0)] + Symbol.ELLIPSIS
 
 
 def fit_hints(hints: list[tuple[str, str]], width: int, gap: int = 3) -> list[tuple[str, str]]:
-    """Fit hints to terminal width by dropping from end."""
+    """Fit hints to terminal width by dropping from end. Uses vlen for accuracy."""
     chosen = list(hints)
     while chosen:
-        if len((" " * gap).join(f"{k} {l}" for k, l in chosen)) <= width - 2:
+        plain = (" " * gap).join(f"{k} {l}" for k, l in chosen)
+        if vlen(plain) <= width - 2:
             return chosen
         chosen.pop()
     return []
 
 
 def render_footer(hints: list[tuple[str, str]], width: int) -> str:
-    """Render footer with thin rule and centered hints."""
+    """Render footer with thin rule and centered hints (vlen for alignment)."""
     chosen = list(hints)
     while chosen:
-        if len((" " * 3).join(f"{k} {l}" for k, l in chosen)) <= width - 2:
+        plain = (" " * 3).join(f"{k} {l}" for k, l in chosen)
+        if vlen(plain) <= width - 2:
             break
         chosen.pop()
-    plain = (" " * 3).join(f"{k} {l}" for k, l in chosen)
     styled = (" " * 3).join(f"{Color.emphasis(k)} {Color.dim(l)}" for k, l in chosen)
     rule = Color.dim("  " + Symbol.BOX_H * max(width - 4, 0))
-    return rule + "\n" + " " * max((width - len(plain)) // 2, 0) + styled
+    return rule + "\n" + " " * max((width - vlen(plain)) // 2, 0) + styled
 
 
 # Standard hint sets
@@ -403,13 +434,13 @@ HINTS_SUB = [
 
 
 def render_header(subtitle: str = "", max_logo_rows: int = 99) -> str:
-    """Render header with logo, blank line, and subtitle."""
+    """Render header with logo, blank line, and subtitle (uses vlen for ANSI-safe checks)."""
     w = term_width()
     logo = Color.emphasis(center_block(pick_logo(w, max_logo_rows), w))
     if subtitle:
-        if len(subtitle) > w:
+        if vlen(subtitle) > w:
             subtitle = subtitle.split(" · ")[0]
-        if len(subtitle) > w:
+        if vlen(subtitle) > w:
             subtitle = subtitle[: max(w - 1, 0)] + Symbol.ELLIPSIS
         sub = Color.dim(subtitle.center(w))
         return "\n".join(["", logo, "", sub])

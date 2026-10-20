@@ -1,6 +1,6 @@
 PERINGATAN: Mode ECB tidak aman untuk data >1 blok (pola plaintext terlihat). Gunakan CBC/GCM.
 ======================================================================
-  CRYPTOLAB CLI v1.0.0 - HASIL ENKRIPSI AES
+  CRYPTOLAB CLI v1.2.0 - HASIL ENKRIPSI AES
 ======================================================================
   Operasi     : AES (ECB) (ENCRYPT)
   Mode        : ECB

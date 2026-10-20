@@ -1,5 +1,5 @@
 ======================================================================
-  CRYPTOLAB CLI v1.0.0 - HASIL ENKRIPSI
+  CRYPTOLAB CLI v1.2.0 - HASIL ENKRIPSI
 ======================================================================
   Operasi     : Vigenere Cipher (ENCRYPT)
   Kunci       : KEY

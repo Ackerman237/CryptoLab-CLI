@@ -1,5 +1,5 @@
 ======================================================================
-  CRYPTOLAB CLI v1.0.0 - HASIL BASE64
+  CRYPTOLAB CLI v1.2.0 - HASIL BASE64
 ======================================================================
   Operasi     : Base64 (ENCODE)
   Status      : BERHASIL (OK)
