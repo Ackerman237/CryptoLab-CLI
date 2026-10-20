@@ -15,9 +15,16 @@
 | 2 | Menutup 4 celah wajib (dekripsi biner, batas ukuran per-format, konflik F2/X2/D5, `argparse` vs runtime) + 7 perbaikan; tambah `--format hex\|base64\|raw` (D3′); verifikasi signature core (§1.1). |
 | 3 | Koreksi klaim salah (§5.0: pesan argparse **memang berubah** → snapshot diperbarui sengaja); tambah **D11** (`raw_bytes` di `AesGcmResult`, opsi 1 disetujui) + tabel kasus GCM UTF-8/hex; geser status APPROVED ke saat merge. |
 | 4 | Tegaskan **posisi field** D11 (Opsi B: sebelum `status_message`, jika tidak → `TypeError`); selaraskan §4 + prinsip kepala dokumen dengan pengecualian D11; tambah tes regresi `output_text`/`is_utf8`/`payload` + kasus kosong & 1 byte di F0b; tambah §6.3 (catatan snapshot parser: `COLUMNS`, versi Python, `-t`+`-f`). |
+| 5 | Perkuat bukti pemanggilan (§3.1): `git grep -rn "AesGcmResult(" -- src tests` (cakupan `src` **dan** `tests`), bukan regex lokal; catat batas bukti skrip (*dataclass tiruan*). Tes F0b pakai **konstanta** (bukan snapshot dinamis). Hapus item tes "cek via review kode" (tak eksekutabel; kasus `"deadbeef"` sudah menjaganya). Nyatakan status `verify_*.py` (bukan dikoleksi pytest). |
 
 **Verifikasi core (diminta reviewer):** dicek langsung, lihat §1.1, §1.2, dan
 `tests/file_mode/verify_core_bytes.py` (skrip pembuktian yang bisa dijalankan).
+
+> **Status skrip di `tests/file_mode/`.** Kedua berkas bernama `verify_*.py`, **bukan**
+> `test_*.py`, sehingga **tidak dikoleksi pytest**. Ini disengaja: PR ini adalah PR
+> dokumen, dan skrip-skrip tersebut hanyalah alat bukti manual (dijalankan dengan
+> `python tests/file_mode/verify_*.py`), bukan bagian dari suite tes. Keduanya akan
+> digantikan/ dilengkapi oleh `tests/test_file_mode.py` pada F0/F0b.
 
 ---
 
@@ -190,10 +197,23 @@ class AesGcmResult:
 ```
 
 Alasan: menyamakan posisi dengan `AesResult`, dan tidak menciptakan default palsu
-`b""` yang bisa menyembunyikan lupa-isi. Kedua konstruktor (`aes.py:407` encrypt,
-`aes.py:488` decrypt) memakai **keyword** (diverifikasi), jadi penempatan baru ini
-**tidak** menggeser pemanggilan yang ada. Keduanya **wajib** menambahkan
-`raw_bytes=...` (encrypt → `ct_bytes`; decrypt → `pt_bytes`).
+`b""` yang bisa menyembunyikan lupa-isi.
+
+**Bukti pemanggilan (definitif, bukan heuristik):** `git grep -rn "AesGcmResult(" -- src tests`
+menghasilkan **tepat dua** pemanggil, keduanya di `aes.py` (`:407`, `:488`), dan keduanya
+memakai **keyword murni** — setiap argumen berbentuk `nama=...` (dibaca langsung, bukan
+regex `"=" in body`). Karena itu penempatan field baru **tidak** menggeser pemanggilan,
+dan **kedua** konstruktor wajib menambahkan `raw_bytes=...`
+(`:407` encrypt → `ct_bytes`; `:488` decrypt → `pt_bytes`).
+
+> Cakupan bukti: grep mencakup seluruh `src/` **dan** `tests/`, sehingga pemanggil di
+> luar `aes.py` (termasuk tes) ikut terperiksa. Bila kelak muncul pemanggil baru, ia
+> akan terlihat di grep yang sama.
+
+> **Batas bukti `verify_field_placement.py`.** Skrip itu memakai **dataclass tiruan**,
+> bukan `AesGcmResult` asli. Tujuannya membuktikan **semantik Python** (aturan urutan
+> field dataclass), bukan menguji kelas nyata. Bukti atas kelas nyata berasal dari grep
+> di atas + tes F0b. Jangan memperlakukan skrip ini sebagai bukti perilaku `AesGcmResult`.
 
 > Alternatif bila ingin tanpa menyentuh urutan: Opsi C — `raw_bytes: bytes = b""`
 > di paling belakang. Tidak dipilih karena default kosong menutupi lupa-isi.
@@ -414,14 +434,20 @@ write_output(path, data: bytes, force=False)
 - [ ] GCM plaintext **kosong** (`b""`) → `raw_bytes == b""`
 - [ ] GCM plaintext **1 byte** (`b"A"` dan 1 byte non-UTF8 `b"\xff"`) → `raw_bytes` == asli
 - [ ] `AesGcmResult.raw_bytes` == plaintext asli untuk **semua** kasus di atas
-- [ ] Dekripsi GCM **tidak** memanggil `bytes.fromhex(output_text)` (cek via review kode
-      atau tes yang menggagalkan bila `output_text` dijadikan sumber)
 
-**Tes regresi F0b (perilaku lama tidak boleh berubah):**
+> Item "pastikan tidak memakai `bytes.fromhex(output_text)`" **dihapus** — ia tidak
+> dapat dieksekusi sebagai tes. Kasus `"deadbeef"` sudah menjaga perilaku itu
+> (jalur `output_text` akan menghasilkan `b'\xde\xad\xbe\xef'` dan gagal).
 
-- [ ] `output_text` dan `is_utf8` **identik** sebelum & sesudah D11 untuk ketiga kasus
-      asli (`"halo"` → `'halo'`/`True`; `"deadbeef"` → `'deadbeef'`/`True`;
-      `os.urandom` → hex/`False`). Snapshot nilai sebelum perubahan direkam dulu.
+**Tes regresi F0b (perilaku lama tidak boleh berubah) — pakai konstanta, bukan snapshot dinamis:**
+
+- [ ] `output_text` dan `is_utf8` **identik** dengan konstanta yang sudah diketahui
+      (tidak perlu merekam secara dinamis — nilainya sudah pasti):
+      | plaintext | `output_text` | `is_utf8` |
+      |---|---|---|
+      | `"halo"` | `"halo"` | `True` |
+      | `"deadbeef"` | `"deadbeef"` | `True` |
+      | `os.urandom` | hex (62+ char) | `False` |
 - [ ] `aes_gcm_encrypt(...).payload` **identik** formatnya (masih `nonce:ct:tag` hex)
 - [ ] `tests/test_tahap3_modes.py` lama **tetap hijau tanpa diubah** (selain penambahan tes)
 - [ ] `import cryptolab` dan `AesGcmResult(...)` **tidak** TypeError (verifikasi posisi field §3.1)
