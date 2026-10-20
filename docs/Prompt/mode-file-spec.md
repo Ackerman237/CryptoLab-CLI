@@ -1,7 +1,7 @@
 # Spec: Mode File (Enkripsi/Dekripsi/Hash Berkas)
 
-**Status:** DRAFT — APPROVED (revisi 3) saat merge
-**Tanggal:** 2026-10-20 (revisi 3)
+**Status:** DRAFT — label APPROVED dipasang **saat merge** (lihat §10)
+**Tanggal:** 2026-10-20 (revisi 6)
 **Target:** `main` pasca-PR #3 (`abe1e4f`)
 **Prinsip:** 1 step = 1 commit · scope = spec ini saja · no behavior change untuk jalur teks (kecuali yang dinyatakan) · no new deps (stdlib only) · `core/` **tidak disentuh** kecuali penambahan field D11 (`raw_bytes` di `AesGcmResult`, §3.1)
 
@@ -16,6 +16,7 @@
 | 3 | Koreksi klaim salah (§5.0: pesan argparse **memang berubah** → snapshot diperbarui sengaja); tambah **D11** (`raw_bytes` di `AesGcmResult`, opsi 1 disetujui) + tabel kasus GCM UTF-8/hex; geser status APPROVED ke saat merge. |
 | 4 | Tegaskan **posisi field** D11 (Opsi B: sebelum `status_message`, jika tidak → `TypeError`); selaraskan §4 + prinsip kepala dokumen dengan pengecualian D11; tambah tes regresi `output_text`/`is_utf8`/`payload` + kasus kosong & 1 byte di F0b; tambah §6.3 (catatan snapshot parser: `COLUMNS`, versi Python, `-t`+`-f`). |
 | 5 | Perkuat bukti pemanggilan (§3.1): `git grep -rn "AesGcmResult(" -- src tests` (cakupan `src` **dan** `tests`), bukan regex lokal; catat batas bukti skrip (*dataclass tiruan*). Tes F0b pakai **konstanta** (bukan snapshot dinamis). Hapus item tes "cek via review kode" (tak eksekutabel; kasus `"deadbeef"` sudah menjaganya). Nyatakan status `verify_*.py` (bukan dikoleksi pytest). |
+| 6 | Rapikan sisa rev-3 di header/§3 (kini rev-6); hapus ambiguitas **F2 vs F3** di §6; koreksi panjang hex F0b (`os.urandom(64)` → **128** char, bukan 62+); catat hasil cek `pyproject.toml` (`python_files` tidak diubah → `verify_*.py` tetap tidak dikoleksi); tandai `verify_field_placement.py` sebagai bukti semantik saja, dilipat/hapus setelah F0b. |
 
 **Verifikasi core (diminta reviewer):** dicek langsung, lihat §1.1, §1.2, dan
 `tests/file_mode/verify_core_bytes.py` (skrip pembuktian yang bisa dijalankan).
@@ -25,6 +26,18 @@
 > dokumen, dan skrip-skrip tersebut hanyalah alat bukti manual (dijalankan dengan
 > `python tests/file_mode/verify_*.py`), bukan bagian dari suite tes. Keduanya akan
 > digantikan/ dilengkapi oleh `tests/test_file_mode.py` pada F0/F0b.
+>
+> **Sudah diverifikasi (bukan asumsi):** `pyproject.toml` hanya menetapkan
+> `[tool.pytest.ini_options] testpaths = ["tests"]` dan `pythonpath = ["src"]` —
+> **tidak** mengubah `python_files`. Tidak ada `pytest.ini`/`setup.cfg`/`tox.ini`.
+> Dicek dengan `pytest --collect-only tests/file_mode/` → **`no tests collected`**.
+>
+> **`verify_field_placement.py` = bukti semantik, bukan bukti D11.** Ia memakai
+> dataclass tiruan (semantik Python). Pengecekan pada kelas nyata ("tidak ada field
+> non-default setelah default") **tidak membuktikan apa-apa** sebelum F0b: kelas yang
+> sudah bisa di-import pasti lolos karena `dataclass` sendiri sudah menolaknya. Bukti
+> nyata untuk D11 adalah tes F0b. Setelah F0b selesai, skrip ini **dihapus** atau
+> **dilipat** ke `tests/test_file_mode.py`.
 
 ---
 
@@ -139,11 +152,11 @@ dalam tahapan, termasuk F2. D5 tidak lagi punya opsi "semua simetris".
 | D7 | Berkas output sudah ada | **tolak**, perlu `--force`; tulis atomik (§5.4) |
 | D8 | Menu interaktif | ya — "Mode File" di tab Simetris & Hash |
 
-**Keputusan tambahan (dari rev-2):**
+**Keputusan tambahan (rev-2):**
 - **D9** Dekripsi menerima `--format` yang sama dengan enkripsi. **Tidak ada auto-detect.**
 - **D10** Dekripsi tanpa `--out` yang menghasilkan non-UTF8 → **galat jelas**, bukan dump byte.
 
-**Keputusan tambahan (revisi 3):**
+**Keputusan tambahan (rev-3):**
 - **D11** Tambah field `raw_bytes: bytes` ke `AesGcmResult` (**opsi 1** yang disarankan
   reviewer), dengan pengecualian tertulis "core beku". Lihat §3.1.
 
@@ -400,8 +413,8 @@ write_output(path, data: bytes, force=False)
 | **F0** | Karakterisasi jalur `--text`, **teks galat argparse & `--help`**, `--format` parsing | `tests/test_file_mode.py` | Belum ada fitur menu. **Snapshot parser diperbarui sengaja** (§5.0) |
 | **F0b** | **D11**: selipkan `raw_bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor | `tests/test_tahap3_modes.py` (kasus §6.1 GCM + regresi `output_text`/`is_utf8`/`payload`) | Satu-satunya sentuhan ke `core/` (§3.1) |
 | **F1** | `cli/input.py` + `--file`/`--out`/`--force`/`--format` untuk **AES-GCM & AES-CBC** | §6.1 | Termasuk round-trip biner |
-| **F2** | Perluas ke perintah lain (hashing) + dokumentasi `--format` | — | **Tanpa DES/RC2** (X2) |
-| **F3** | `hash --file` → `hash_file` **langsung** | hash berkas besar (>10 MB) lolos | Lihat §6.2 |
+| **F2** | `hash --file` → `hash_file` **langsung** (streaming 8 KB, **tanpa** batas 10 MB) | hash berkas besar (>10 MB) lolos | Lihat §6.2. Berisi satu perintah saja (hash) |
+| **F3** | Perluas `--file`/`--format` ke perintah lain yang relevan + dokumentasi `--format` | round-trip per perintah | **Tanpa DES/RC2** (X2) |
 | **F4** | Menu interaktif "Mode File" (+ Hash File) | snapshot menu | **PR terpisah** (lihat §12) |
 | **F5** | Docs: `docs/USAGE.md` + README | — | — |
 
@@ -447,7 +460,11 @@ write_output(path, data: bytes, force=False)
       |---|---|---|
       | `"halo"` | `"halo"` | `True` |
       | `"deadbeef"` | `"deadbeef"` | `True` |
-      | `os.urandom` | hex (62+ char) | `False` |
+      | `os.urandom(64)` | hex dari plaintext (**2 × panjang byte** = 128 char) | `False` |
+
+      > Untuk kasus non-UTF8, `output_text` = `plaintext.hex()`, jadi panjangnya
+      > **selalu 2 × jumlah byte** (64 byte → **128 char**, bukan 62+). Tes tidak
+      > boleh menyalin angka tetap; bandingkan dengan `plaintext.hex()`.
 - [ ] `aes_gcm_encrypt(...).payload` **identik** formatnya (masih `nonce:ct:tag` hex)
 - [ ] `tests/test_tahap3_modes.py` lama **tetap hijau tanpa diubah** (selain penambahan tes)
 - [ ] `import cryptolab` dan `AesGcmResult(...)` **tidak** TypeError (verifikasi posisi field §3.1)

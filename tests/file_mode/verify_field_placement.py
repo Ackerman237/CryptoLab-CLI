@@ -5,9 +5,14 @@ Dirujuk oleh docs/Prompt/mode-file-spec.md §3.1.
 BATAS BUKTI (penting):
   - Bagian "semantik Python" memakai dataclass TIRUAN. Tujuannya membuktikan
     aturan urutan field dataclass, bukan menguji AesGcmResult asli.
-  - Bagian "kelas nyata" memuat AesGcmResult ASLI dan memakai dataclasses.fields()
-    untuk memeriksa posisi field, serta memverifikasi bahwa nilai bisa dibangun.
-  - Bukti perilaku lengkap tetap ada di tests/test_file_mode.py (F0b).
+  - Bagian "kelas nyata" hanya memverifikasi bahwa AesGcmResult bisa di-import
+    dan urutan field-nya konsisten. Sebelum F0b, ini TIDAK membuktikan apa-apa:
+    kelas yang bisa di-import pasti lolos karena dataclass sendiri menolak
+    field non-default setelah field berdefault.
+  - Bukti NYATA untuk D11 adalah tes F0b (tests/test_tahap3_modes.py).
+
+STATUS: skrip sementara. Setelah F0b selesai, HAPUS skrip ini atau LIPAT
+isinya ke tests/test_file_mode.py.
 
 Jalankan:
     .venv\\Scripts\\python.exe tests/file_mode/verify_field_placement.py
