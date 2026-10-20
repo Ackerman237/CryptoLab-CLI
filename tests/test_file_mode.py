@@ -59,6 +59,13 @@ SUBPERINTAH_WAJIB_TEXT = [
 
 # (sub-command tokens) used for case (a): missing ``-t`` -> argparse error.
 # Kept explicit (not generated) so a parser change shows up as a diff here too.
+#
+# F1 (§5.0, approved exception #2): ``aes`` was REMOVED from this list. After F1
+# its ``-t``/``-f`` are a mutually-exclusive group, so the pre-F1 message
+# ("the following arguments are required: -t/--text") became
+# "one of the arguments -t/--text -f/--file is required". That new message is
+# recorded in tests/test_file_mode_f1_parser.py. ``aes-gcm`` (new in F1) is
+# covered there too. This removal is the intentional snapshot diff for §5.0.
 KASUS_A_TANPA_TEXT = [
     ("caesar", "encrypt"),
     ("brute",),
@@ -74,7 +81,6 @@ KASUS_A_TANPA_TEXT = [
     ("detect",),
     ("auto",),
     ("des", "encrypt"),
-    ("aes", "encrypt"),
     ("rc2", "encrypt"),
     ("hmac",),
 ]

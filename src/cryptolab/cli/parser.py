@@ -287,11 +287,19 @@ def create_parser() -> argparse.ArgumentParser:
         choices=["encrypt", "decrypt", "auto"],
         help="Aksi: encrypt, decrypt, atau auto",
     )
-    aes_parser.add_argument(
+    # F1 (§5.0): -t dan -f saling eksklusif, salah satu wajib.
+    aes_input = aes_parser.add_mutually_exclusive_group(required=True)
+    aes_input.add_argument(
         "-t",
         "--text",
-        required=True,
+        default=None,
         help="Plaintext (encrypt) atau ciphertext heksadesimal (decrypt/auto)",
+    )
+    aes_input.add_argument(
+        "-f",
+        "--file",
+        default=None,
+        help="Baca plaintext/ciphertext dari berkas (mode file, F1)",
     )
     aes_parser.add_argument(
         "-k",
@@ -317,6 +325,71 @@ def create_parser() -> argparse.ArgumentParser:
         default="PKCS7",
         choices=["PKCS7", "None", "pkcs7", "none"],
         help="Skema padding: PKCS7 (default) atau None",
+    )
+    # F1: opsi mode file (hanya relevan bila -f/--file dipakai).
+    aes_parser.add_argument(
+        "-o",
+        "--out",
+        default=None,
+        help="Tulis hasil ke berkas ini (mode file, F1)",
+    )
+    aes_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Timpa berkas --out bila sudah ada (mode file, F1)",
+    )
+    aes_parser.add_argument(
+        "--format",
+        default="hex",
+        choices=["hex", "base64", "raw"],
+        help="Format berkas ciphertext: hex (default), base64, atau raw (mode file, F1)",
+    )
+
+    # AES-GCM (AEAD)
+    gcm_parser = subparsers.add_parser(
+        "aes-gcm", help="Operasi AES-GCM (AEAD) - direkomendasikan untuk berkas"
+    )
+    gcm_parser.add_argument(
+        "action",
+        choices=["encrypt", "decrypt"],
+        help="Aksi: encrypt atau decrypt",
+    )
+    # F1 (§5.0): -t dan -f saling eksklusif, salah satu wajib.
+    gcm_input = gcm_parser.add_mutually_exclusive_group(required=True)
+    gcm_input.add_argument(
+        "-t",
+        "--text",
+        default=None,
+        help="Plaintext (encrypt) atau payload nonce:ciphertext:tag (decrypt)",
+    )
+    gcm_input.add_argument(
+        "-f",
+        "--file",
+        default=None,
+        help="Baca plaintext/ciphertext dari berkas (mode file, F1)",
+    )
+    gcm_parser.add_argument(
+        "-k",
+        "--key",
+        default=None,
+        help="Kunci AES sepanjang 16/24/32 byte/karakter",
+    )
+    gcm_parser.add_argument(
+        "-o",
+        "--out",
+        default=None,
+        help="Tulis hasil ke berkas ini (mode file, F1)",
+    )
+    gcm_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Timpa berkas --out bila sudah ada (mode file, F1)",
+    )
+    gcm_parser.add_argument(
+        "--format",
+        default="hex",
+        choices=["hex", "base64", "raw"],
+        help="Format berkas ciphertext: hex (default), base64, atau raw (mode file, F1)",
     )
 
     # RC2 / ARC2 (CBC / ECB)

@@ -19,6 +19,7 @@ from cryptolab.cli.commands import (
     handle_history,
     handle_des,
     handle_aes,
+    handle_aes_gcm,
     handle_rc2,
     handle_hash,
     handle_hmac,
@@ -54,6 +55,7 @@ __all__ = [
     # Symmetric
     "handle_des",
     "handle_aes",
+    "handle_aes_gcm",
     "handle_rc2",
     # Hashing
     "handle_hash",
@@ -95,6 +97,7 @@ def handle_cli_args(args) -> int:
         "history": handle_history,
         "des": handle_des,
         "aes": handle_aes,
+        "aes-gcm": handle_aes_gcm,
         "rc2": handle_rc2,
         "hash": handle_hash,
         "hmac": handle_hmac,

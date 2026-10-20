@@ -491,7 +491,7 @@ write_output(path, data: bytes, force=False)
 |------|-----|-----|---------|
 | **F0** | Karakterisasi jalur `--text`, **teks galat argparse & `--help`**, `--format` parsing | `tests/test_file_mode.py` | Belum ada fitur menu. **Snapshot parser diperbarui sengaja** (§5.0) |
 | **F0b** | **D11**: selipkan `raw_bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor. ✅ **SELESAI** (rev-9) | `tests/test_file_mode.py::TestF0bAesGcmRawBytes` + `TestF0bRegresiGcm` | Satu-satunya sentuhan ke `core/` (§3.1). `aes.py` +3 baris |
-| **F1** | `cli/input.py` + `--file`/`--out`/`--force`/`--format` untuk **AES-GCM & AES-CBC** | §6.1 | Termasuk round-trip biner |
+| **F1** | `cli/input.py` + `--file`/`--out`/`--force`/`--format` untuk **AES-GCM & AES-CBC** | §6.1 | Termasuk round-trip biner. **Dipecah F1a+F1b+F1c** (lihat di bawah) |
 | **F4** | Menu interaktif "Mode File" (+ Hash File) | snapshot menu | **PR terpisah** (lihat §12) |
 | **F5** | Docs: `docs/USAGE.md` + README (+ dokumentasi kontrak `hash -f`: `--encoding` diabaikan untuk `file`, `action` menang atas `-t`/`-f`) | — | Menyerap sisa F2 (lihat catatan rev-9) |
 
@@ -509,6 +509,30 @@ write_output(path, data: bytes, force=False)
 
 > F0b ditulis sebelum F1 agar `cli/input.py` langsung memakai `raw_bytes` untuk
 > **kedua** algoritma — tidak perlu jalur sementara `is_utf8` sama sekali.
+
+**F1 = F1a + F1b + F1c (dipecah atas permintaan reviewer, rev-10).** Tiga commit
+terpisah agar bisa direview bertahap:
+
+| Sub-step | Isi | Berkas |
+|---|---|---|
+| **F1a** | `cli/input.py` + tes unit; **belum** ada wiring ke parser | `cli/input.py`, `tests/test_file_mode_f1_input.py` |
+| **F1b** | parser + wiring **AES-GCM** (sub-command baru `aes-gcm`) & pembaruan snapshot sengaja | `cli/parser.py`, `cli/commands/symmetric.py`, `cli/__init__.py`, `cli/commands/__init__.py`, `tests/test_file_mode_f1_parser.py`, `tests/test_file_mode.py` |
+| **F1c** | wiring **AES-CBC** (perintah `aes`) | `cli/commands/symmetric.py` |
+
+> **Koreksi rev-10 — KONFLIK SPEC vs KODE yang ditemukan saat recon F1.**
+> Spec (rev-1..9) mengasumsikan **Dua perintah CLI** "AES-GCM & AES-CBC". Kenyataannya:
+> - **AES-GCM TIDAK punya sub-command CLI.** Ia hanya ada di menu interaktif
+>   (`interactive/handlers/ctx_symmetric.py::fn_aes_gcm`). Sub-command `aes` di CLI
+>   hanya CBC/ECB (`-m {CBC,ECB}`, `action {encrypt,decrypt,auto}`).
+> - **Core CBC mengembalikan `ct_hex` SAJA**, bukan `iv:ct`. Jadi `cli/input.py`
+>   merakit `iv_hex:ciphertext_hex` sendiri (`build_cbc_payload`) dan dekripsi CBC
+>   memakai IV dari payload (di-`bytes.fromhex`), bukan dari `--iv` yang di-UTF-8.
+>
+> **Keputusan reviewer (rev-10):**
+> 1. GCM diwujudkan sebagai **sub-command CLI baru `aes-gcm`** (pilihan paling
+>    aditif; tidak mengubah pilihan `-m` yang ada = tidak ada perubahan perilaku
+>    pada jalur lama). Ini **fitur baru**, dicatat sebagai pengecualian cakupan.
+> 2. CBC merakit `iv:ct` di `cli/input.py`; dekripsi CBC memakai IV dari payload.
 
 ### 6.1 Daftar tes F1 (wajib, menutup permintaan reviewer)
 
