@@ -96,6 +96,13 @@ def handle_aes(args: Namespace) -> int:
         if norm_mode == "ECB":
             print_warning(warn_ecb_mode())
 
+        # F1c: mode file AES-CBC — hanya bila -f/--file dipakai. Jalur --text
+        # tetap persis seperti semula (tidak dialihkan lewat fungsi baru).
+        if getattr(args, "file", None) is not None:
+            return _handle_aes_file(args, norm_mode, norm_padding, history_enabled)
+        if getattr(args, "out", None) is not None:
+            raise InvalidInputError("--out hanya berlaku bersama --file (mode file).")
+
         if args.action == "auto":
             candidates = aes_auto_analyze(args.text, key=args.key, iv=args.iv)
             if not candidates:
@@ -227,6 +234,60 @@ def _emit_decrypted(raw_bytes: bytes, out_path, force: bool):
 
 def _print_file_result(title: str, source: str, output: str, params: dict) -> None:
     print(render_box(title, source, source, output, params))
+
+
+def _aes_cbc_file(args: Namespace, norm_mode: str, norm_padding: str, history_enabled: bool) -> int:
+    """AES-CBC file mode (encrypt/decrypt). The --text path is handled elsewhere."""
+    if not args.key:
+        raise InvalidInputError("Operasi encrypt/decrypt AES memerlukan parameter --key / -k (16 byte).")
+
+    fmt = args.format
+    if args.action == "auto":
+        raise InvalidInputError("Aksi 'auto' tidak didukung untuk mode file. Gunakan encrypt atau decrypt.")
+
+    if args.action == "encrypt":
+        data = fin.read_file_bytes(args.file, fin.LIMIT_PLAINTEXT_BYTES)
+        enc_res = aes_encrypt(data, key=args.key, mode=norm_mode, iv=args.iv, padding=norm_padding)
+        # Core CBC returns ct_hex only; assemble iv:ct here (spec §3.1, D6b).
+        if norm_mode == "CBC":
+            if args.iv is None:
+                raise InvalidInputError("Mode CBC memerlukan --iv untuk enkripsi berkas.")
+            iv_bytes = args.iv.encode("utf-8") if isinstance(args.iv, str) else args.iv
+            payload = fin.build_cbc_payload(iv_bytes.hex(), enc_res.output_text)
+        else:
+            payload = enc_res.output_text
+        out = fin.encode_ciphertext(payload, fmt, "CBC")
+
+        if args.out is None:
+            if fmt == "raw":
+                raise InvalidInputError("Format raw butuh --out; byte mentah tidak dicetak ke terminal.")
+            print(out.decode("ascii", errors="replace"))
+        else:
+            fin.write_output(args.out, out, force=args.force, source_path=args.file)
+            print(f"Ditulis ke {args.out} ({len(out)} byte)")
+        log_history("AES File Encrypt", args.file, str(len(out)), {"mode": norm_mode, "format": fmt}, enabled=history_enabled)
+        return 0
+
+    # decrypt
+    raw = fin.read_decrypt_bytes(args.file, fmt, "CBC")
+    parsed = fin.decode_ciphertext(raw, fmt, "CBC")
+    iv = bytes.fromhex(parsed["iv_hex"]) if norm_mode == "CBC" else args.iv
+    try:
+        dec_res = aes_decrypt(parsed["ct_hex"], key=args.key, mode=norm_mode, iv=iv, padding=norm_padding)
+    except (DecodingError, InvalidInputError):
+        raise InvalidInputError("Dekripsi gagal: kunci salah atau data rusak.")
+    code, summary = _emit_decrypted(dec_res.raw_bytes, args.out, args.force)
+    _print_file_result("Hasil Dekripsi AES (File)", args.file, summary, {"Mode": norm_mode, "Format": fmt})
+    log_history("AES File Decrypt", args.file, summary, {"mode": norm_mode, "format": fmt}, enabled=history_enabled)
+    return code
+
+
+def _handle_aes_file(args: Namespace, norm_mode: str, norm_padding: str, history_enabled: bool) -> int:
+    try:
+        return _aes_cbc_file(args, norm_mode, norm_padding, history_enabled)
+    except (InvalidInputError, InvalidKeyError, DecodingError) as err:
+        print(render_error("Invalid Input", str(err)), file=sys.stderr)
+        return 1
 
 
 def handle_aes_gcm(args: Namespace) -> int:
