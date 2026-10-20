@@ -1,7 +1,7 @@
 # Spec: Mode File (Enkripsi/Dekripsi/Hash Berkas)
 
-**Status:** APPROVED (revisi 8) — di-merge lewat PR #4; rev-8 adalah koreksi fakta pasca-F0
-**Tanggal:** 2026-10-20 (revisi 8)
+**Status:** APPROVED (revisi 9) — di-merge lewat PR #4; rev-8/9 adalah koreksi fakta pasca-F0
+**Tanggal:** 2026-10-20 (revisi 9)
 **Target:** `main` pasca-PR #3 (`abe1e4f`)
 **Prinsip:** 1 step = 1 commit · scope = spec ini saja · no behavior change untuk jalur teks (kecuali yang dinyatakan) · no new deps (stdlib only) · `core/` **tidak disentuh** kecuali penambahan field D11 (`raw_bytes` di `AesGcmResult`, §3.1)
 
@@ -19,27 +19,25 @@
 | 6 | Rapikan sisa rev-3 di header/§3 (kini rev-6); hapus ambiguitas **F2 vs F3** di §6; koreksi panjang hex F0b (`os.urandom(64)` → **128** char, bukan 62+); catat hasil cek `pyproject.toml` (`python_files` tidak diubah → `verify_*.py` tetap tidak dikoleksi); tandai `verify_field_placement.py` sebagai bukti semantik saja, dilipat/hapus setelah F0b. |
 | 7 | Koreksi §6.3 butir 3: kasus `-t` + `-f` bersama **tidak mungkin** direkam di F0 (opsi `-f` belum ada → pesan saat ini `unrecognized arguments`). F0 merekam perilaku apa adanya; `-t` + `-f` + pembaruan snapshot dipindah ke F1. |
 | 8 | **Koreksi berdasarkan temuan F0** (§1.3): `hash` **sudah** punya `-f/--file` + `--encoding` → F2 = **selaraskan** (bukan tambah), kontrak §1.3a dikunci. Kebijakan eksklusivitas **per perintah** (`required=True` hanya untuk 17 perintah ber-`-t`-wajib; `hash`/`rsa` → `required=False`, galat tetap di handler). Cakupan F1 = **hanya AES-GCM & AES-CBC** (churn snapshot kecil). F3 **didefinisikan ulang** (sisa kandidat: `hmac`; else hapus). Catat bahwa `rsa encrypt`/`hash compute` gagal di **handler**, bukan argparse. |
+| 9 | **Keputusan reviewer atas rev-8:** **F3 dihapus** → `hmac --file` jadi **X7** (out-of-scope). **F2 dihapus** & diserap **F5** (dokumentasi saja). **`hash`/`rsa` tidak disentuh** di parser (saran `required=False` rev-8 dibatalkan: memasang mutual-exclusion pada `hash` mengubah `-t`+`-f` yang valid jadi galat). Urutan final: **F0 → F0b → F1 → F4 → F5**. **D11 diimplementasi di F0b**: `raw_bytes` diselipkan di `AesGcmResult` + diisi di 2 konstruktor; `verify_field_placement.py` dihapus (dilipat ke `TestF0bAesGcmRawBytes`). |
 
 **Verifikasi core (diminta reviewer):** dicek langsung, lihat §1.1, §1.2, dan
 `tests/file_mode/verify_core_bytes.py` (skrip pembuktian yang bisa dijalankan).
 
-> **Status skrip di `tests/file_mode/`.** Kedua berkas bernama `verify_*.py`, **bukan**
-> `test_*.py`, sehingga **tidak dikoleksi pytest**. Ini disengaja: PR ini adalah PR
-> dokumen, dan skrip-skrip tersebut hanyalah alat bukti manual (dijalankan dengan
-> `python tests/file_mode/verify_*.py`), bukan bagian dari suite tes. Keduanya akan
-> digantikan/ dilengkapi oleh `tests/test_file_mode.py` pada F0/F0b.
+> **Status skrip di `tests/file_mode/`.** Berkas `verify_core_bytes.py` bernama
+> `verify_*.py`, **bukan** `test_*.py`, sehingga **tidak dikoleksi pytest**.
+> Ini disengaja: alat bukti manual (dijalankan dengan
+> `python tests/file_mode/verify_core_bytes.py`), bukan bagian dari suite tes.
+>
+> **`verify_field_placement.py` sudah DIHAPUS di F0b** (rev-9), sesuai catatan
+> sebelumnya: isinya (posisi field `raw_bytes` + bukti semantik Python) kini
+> **dilipat** ke `tests/test_file_mode.py::TestF0bAesGcmRawBytes`. Bukti nyata
+> untuk D11 adalah tes F0b tersebut, bukan skrip tiruan.
 >
 > **Sudah diverifikasi (bukan asumsi):** `pyproject.toml` hanya menetapkan
 > `[tool.pytest.ini_options] testpaths = ["tests"]` dan `pythonpath = ["src"]` —
 > **tidak** mengubah `python_files`. Tidak ada `pytest.ini`/`setup.cfg`/`tox.ini`.
 > Dicek dengan `pytest --collect-only tests/file_mode/` → **`no tests collected`**.
->
-> **`verify_field_placement.py` = bukti semantik, bukan bukti D11.** Ia memakai
-> dataclass tiruan (semantik Python). Pengecekan pada kelas nyata ("tidak ada field
-> non-default setelah default") **tidak membuktikan apa-apa** sebelum F0b: kelas yang
-> sudah bisa di-import pasti lolos karena `dataclass` sendiri sudah menolaknya. Bukti
-> nyata untuk D11 adalah tes F0b. Setelah F0b selesai, skrip ini **dihapus** atau
-> **dilipat** ke `tests/test_file_mode.py`.
 
 ---
 
@@ -162,7 +160,7 @@ bukan usage.
 | S6 | **Dekripsi ke berkas biner** — inti tujuan fitur |
 | S7 | Menu interaktif "Mode File" (D8) |
 | S8 | Pesan galat berkas yang ramah |
-| S9 | `hash --file` — **SUDAH ADA** (`-f/--file` di `parser.py:359`), tinggal **diselaraskan** dengan opsi baru (lihat koreksi rev-8) |
+| S9 | `hash --file` — **SUDAH ADA** (`-f/--file` di `parser.py:359`); **tidak diubah** (rev-9). Kontraknya dikunci di F0 (§1.3a), sisa dokumentasi di F5 |
 
 ### Tidak termasuk (out-of-scope, sengaja ditunda)
 
@@ -174,6 +172,7 @@ bukan usage.
 | X4 | Integritas otomatis untuk AES-CBC | GCM sudah AEAD; CBC ditunda (lihat §7.4) |
 | X5 | Kompresi (`--compress`) | gunakan `tar czf` / `gzip` di luar tool untuk sekarang; fase 2 (lihat §7.7) |
 | X6 | Progres bar | baru berguna bersama X1 |
+| X7 | `hmac --file` | di luar scope awal ("enkripsi, dekripsi, hash berkas"); butuh keputusan baru: format kunci, streaming per-chunk, batas ukuran. Spec kecil tersendiri bila dibutuhkan (rev-9, bekas F3) |
 
 **Catatan konsistensi (menutup konflik rev-1):** X2 melarang DES/RC2.
 Karena itu **F2 hanya memperluas ke AES-CBC** — DES/RC2 **tidak** muncul di manapun
@@ -240,7 +239,7 @@ class AesGcmResult:
 
 `raw_bytes: bytes` **tanpa default** tidak boleh ditaruh setelah `status_message`
 → `TypeError: non-default argument 'raw_bytes' follows default argument`
-(diverifikasi: lihat `tests/file_mode/verify_field_placement.py`).
+(diverifikasi F0b: `tests/test_file_mode.py::TestF0bAesGcmRawBytes::test_konstruktor_tanpa_raw_bytes_typerror`).
 
 **Pilihan (diputuskan): Opsi B — selipkan sebelum field berdefault**, sejajar dengan
 `AesResult` yang juga menaruh `raw_bytes` di antara field non-default:
@@ -266,10 +265,11 @@ dan **kedua** konstruktor wajib menambahkan `raw_bytes=...`
 > luar `aes.py` (termasuk tes) ikut terperiksa. Bila kelak muncul pemanggil baru, ia
 > akan terlihat di grep yang sama.
 
-> **Batas bukti `verify_field_placement.py`.** Skrip itu memakai **dataclass tiruan**,
-> bukan `AesGcmResult` asli. Tujuannya membuktikan **semantik Python** (aturan urutan
-> field dataclass), bukan menguji kelas nyata. Bukti atas kelas nyata berasal dari grep
-> di atas + tes F0b. Jangan memperlakukan skrip ini sebagai bukti perilaku `AesGcmResult`.
+> **Batas bukti (dulu `verify_field_placement.py`, kini dihapus).** Skrip itu
+> memakai **dataclass tiruan**, bukan `AesGcmResult` asli — hanya membuktikan
+> **semantik Python** (aturan urutan field dataclass). Sudah dihapus di F0b
+> (rev-9); isinya dilipat ke `TestF0bAesGcmRawBytes`. Bukti atas kelas nyata
+> berasal dari grep di atas + tes F0b.
 
 > Alternatif bila ingin tanpa menyentuh urutan: Opsi C — `raw_bytes: bytes = b""`
 > di paling belakang. Tidak dipilih karena default kosong menutupi lupa-isi.
@@ -302,7 +302,7 @@ disetujui** karena menyamakan asimetri dan mencegah kelas bug §1.2.
 | `src/cryptolab/cli/input.py` **(baru)** | `read_input`, `read_file_bytes`, `write_output`, konversi format, `payload` CBC/GCM |
 | `src/cryptolab/core/symmetric/aes.py` | **HANYA D11**: selipkan field `raw_bytes: bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor (`:407`, `:488`). Tidak ada perubahan logika kripto, `output_text`, atau `is_utf8`. |
 | `src/cryptolab/cli/commands/symmetric.py` | Pakai `cli/input.py`; jalur `--text` tetap identik |
-| `src/cryptolab/cli/commands/hashing.py` | `hash --file` **sudah** memanggil `hash_file()` langsung (hashing.py:61) — **diselaraskan** dengan opsi baru, **tidak** mengubah kontrak §1.3a (streaming, galat, `--encoding` diabaikan) |
+| `src/cryptolab/cli/commands/hashing.py` | **Tidak disentuh (rev-9).** `hash --file` sudah memanggil `hash_file()` langsung; kontrak §1.3a dikunci. Sisa (dokumentasi inkonsistensi `--encoding`/`action`) dilipat ke F5 |
 | `src/cryptolab/interactive/handlers/ctx_symmetric.py` | Handler "Mode File" |
 | `src/cryptolab/interactive/handlers/ctx_hashing.py` | Handler "Hash File" |
 | `src/cryptolab/interactive/tab_menu.py` | Item baru di `CATEGORIES` |
@@ -317,23 +317,28 @@ disetujui** karena menyamakan asimetri dan mencegah kelas bug §1.2.
 
 ## 5. Kontrak Perilaku
 
-### 5.0 Parsing argumen (menutup masalah 4) — **KOREKSI rev-3**
+### 5.0 Parsing argumen (menutup masalah 4) — **KOREKSI rev-3, rev-8, rev-9**
 
-**Opsi terpilih: `add_mutually_exclusive_group` — tetapi jenis group berbeda per
-perintah (KOREKSI rev-8).**
+**Opsi terpilih: `add_mutually_exclusive_group(required=True)` untuk AES-GCM & AES-CBC.**
 
-Rev-1..7 mengasumsikan satu aturan global `required=True`. Temuan F0 (§1.3b)
-menunjukkan itu **salah**: hanya 17 dari 24 perintah yang `-t`-nya wajib. Untuk
-`hash` dan `rsa` yang wajib adalah `action`, dan `-t` opsional — di sana group
-harus `required=False` dan galat "tanpa input" tetap ditangani **handler**
-seperti sekarang (§1.3c/d).
+Rev-1..7 mengasumsikan satu aturan global. Temuan F0 (§1.3b) menunjukkan itu
+**salah**: hanya 17 dari 24 perintah yang `-t`-nya wajib. F1 **hanya menyentuh
+AES-GCM & AES-CBC** (keduanya ber-`-t`-wajib) → `required=True` tepat untuk
+keduanya.
 
-| Perintah | `-t` wajib? | Jenis group | "Tanpa input" |
-|---|---|---|---|
-| AES-GCM, AES-CBC (F1) | ya | `required=True` | argparse, exit 2 (pesan baru §5.0) |
-| 15 perintah `-t`-wajib lain | ya | tidak disentuh di F1 | — |
-| `hash` | tidak (yang wajib `action`) | `required=False` | handler, exit 1 (seperti sekarang) |
-| `rsa` | tidak (yang wajib `action`) | `required=False` | handler, exit 1 (seperti sekarang) |
+| Perintah | `-t` wajib? | Perlakuan di F1 |
+|---|---|---|
+| AES-GCM, AES-CBC (F1) | ya | `add_mutually_exclusive_group(required=True)` |
+| 15 perintah `-t`-wajib lain | ya | **tidak disentuh** |
+| `hash` | tidak (yang wajib `action`) | **tidak disentuh sama sekali** (rev-9) |
+| `rsa` | tidak (yang wajib `action`) | **tidak disentuh** |
+
+> ⚠️ **Koreksi rev-9 (atas koreksi reviewer sebelumnya).** Saran "`hash`/`rsa`
+> pakai group `required=False`" **dibatalkan**: memasang mutual-exclusion pada
+> `hash` akan mengubah kombinasi `-t` + `-f` yang **sekarang valid** menjadi
+> galat — perubahan perilaku yang baru saja dikunci `TestF0HashFileKontrak`.
+> Karena itu **`hash` tidak diubah di parser**; begitu pula `rsa`. Sisa F2 hanya
+> dokumentasi → dilipat ke F5 (lihat §6).
 
 **Cakupan F1 hanya AES-GCM & AES-CBC.** Dari 17 perintah ber-`-t`-wajib, hanya
 **dua** yang disentuh. Parser perintah lain tidak berubah → churn snapshot sangat
@@ -378,16 +383,14 @@ Akibatnya `InvalidInputError` di §5.1 **hanya** untuk galat runtime berkas
 (tidak ada, bukan berkas, terlalu besar, izin), bukan untuk "tidak ada input".
 
 ```python
-# Perintah yang -t-nya wajib (mis. AES-GCM/CBC di F1, dan 15 lainnya saat disentuh):
+# HANYA AES-GCM & AES-CBC (F1). Keduanya ber-`-t`-wajib:
 grup = parser.add_mutually_exclusive_group(required=True)
 grup.add_argument("-t", "--text")
 grup.add_argument("-f", "--file")
 
-# Perintah yang yang-wajib adalah action, bukan teks (hash, rsa):
-#   group TIDAK required; "tanpa input" tetap galat handler seperti sekarang.
-grup = parser.add_mutually_exclusive_group(required=False)
-grup.add_argument("-t", "--text", default=None)
-grup.add_argument("-f", "--file", default=None)
+# `hash` dan `rsa` TIDAK disentuh sama sekali (rev-9):
+#   memasang group pada `hash` akan mengubah `-t` + `-f` (sekarang valid) jadi galat.
+#   `hash -f` sudah ada; kontraknya dikunci TestF0HashFileKontrak.
 ```
 
 ### 5.1 Membaca input
@@ -490,12 +493,22 @@ write_output(path, data: bytes, force=False)
 | Step | Isi | Tes | Catatan |
 |------|-----|-----|---------|
 | **F0** | Karakterisasi jalur `--text`, **teks galat argparse & `--help`**, `--format` parsing | `tests/test_file_mode.py` | Belum ada fitur menu. **Snapshot parser diperbarui sengaja** (§5.0) |
-| **F0b** | **D11**: selipkan `raw_bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor | `tests/test_tahap3_modes.py` (kasus §6.1 GCM + regresi `output_text`/`is_utf8`/`payload`) | Satu-satunya sentuhan ke `core/` (§3.1) |
+| **F0b** | **D11**: selipkan `raw_bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor. ✅ **SELESAI** (rev-9) | `tests/test_file_mode.py::TestF0bAesGcmRawBytes` + `TestF0bRegresiGcm` | Satu-satunya sentuhan ke `core/` (§3.1). `aes.py` +3 baris |
 | **F1** | `cli/input.py` + `--file`/`--out`/`--force`/`--format` untuk **AES-GCM & AES-CBC** | §6.1 | Termasuk round-trip biner |
-| **F2** | **Selaraskan** `hash --file` (yang **sudah ada**) dengan opsi baru (`-o`, eksklusivitas `-t`) **tanpa** mengubah kontrak §1.3a | kontrak §1.3a tetap hijau (streaming, galat, `--encoding` diabaikan) | Lihat §6.2. Bukan "tambah `-f`" — sudah ada |
-| **F3** | **Didefinisikan ulang (rev-8)**: hanya `hmac` (satu-satunya kandidat sisa di luar X2 yang belum jelas). Bila reviewer menilai `hmac` tidak relevan, **hapus F3** dan cukup andalkan dokumentasi `--format` di F5 | `hmac --file` round-trip (bila dikerjakan) | X2 melarang DES/RC2/RSA/klasik; `hash` sudah di F2 → **tidak ada** perintah lain selain `hmac` |
 | **F4** | Menu interaktif "Mode File" (+ Hash File) | snapshot menu | **PR terpisah** (lihat §12) |
-| **F5** | Docs: `docs/USAGE.md` + README | — | — |
+| **F5** | Docs: `docs/USAGE.md` + README (+ dokumentasi kontrak `hash -f`: `--encoding` diabaikan untuk `file`, `action` menang atas `-t`/`-f`) | — | Menyerap sisa F2 (lihat catatan rev-9) |
+
+> **F2 & F3 dihapus (rev-9).**
+> - **F3 dihapus** atas keputusan reviewer: HMAC di luar scope awal
+>   ("enkripsi, dekripsi, hash berkas"). `hmac --file` bukan sekadar wiring —
+>   ia butuh keputusan baru (format kunci, streaming per-chunk, batas ukuran).
+>   Dicatat sebagai **X7** agar ide tidak hilang.
+> - **F2 dihapus** dan diserap F5: `hash` **tidak** disentuh di parser.
+>   Memasang mutual-exclusion pada `hash` akan mengubah kombinasi `-t` + `-f`
+>   yang **sekarang valid** (dikunci `TestF0HashFileKontrak`) menjadi galat —
+>   itu perubahan perilaku. Yang tersisa hanyalah **dokumentasi** dua
+>   inkonsistensi yang sengaja **tidak** diperbaiki: `--encoding` diabaikan
+>   untuk `file`, dan `action` menang atas `-t`/`-f`.
 
 > F0b ditulis sebelum F1 agar `cli/input.py` langsung memakai `raw_bytes` untuk
 > **kedua** algoritma — tidak perlu jalur sementara `is_utf8` sama sekali.
@@ -674,8 +687,10 @@ Rev-2: **D9** (tanpa auto-detect), **D10** (dekripsi non-UTF8 tanpa `--out` = ga
 Rev-3: **D11** (`raw_bytes` pada `AesGcmResult`, opsi 1).
 Rev-8: koreksi fakta pasca-F0 (§1.3) — `hash` sudah punya `-f`; kebijakan group per
 perintah; cakupan F1 = AES-GCM/CBC; F3 didefinisikan ulang. **D1–D11 tidak berubah.**
+Rev-9: F3 dihapus (→ X7), F2 dihapus (→ F5), `hash`/`rsa` tidak disentuh parser.
+Urutan final **F0 → F0b → F1 → F4 → F5**. **D1–D11 tetap tidak berubah.**
 
-**Status dokumen:** **APPROVED (revisi 8)** — rev-8 adalah koreksi fakta (bukan
+**Status dokumen:** **APPROVED (revisi 9)** — rev-8/9 adalah koreksi fakta (bukan
 perubahan keputusan desain) setelah F0; label APPROVED dari PR #4 tetap berlaku.
 
 ---

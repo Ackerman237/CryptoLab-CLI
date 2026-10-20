@@ -418,3 +418,151 @@ class TestF0HashFileKontrak:
         code, _, err = run_cli("hash", "compute")
         assert code == 1
         assert "memerlukan parameter --text" in err
+
+
+# ---------------------------------------------------------------------------
+# F0b — D11: `AesGcmResult.raw_bytes`
+# ---------------------------------------------------------------------------
+class TestF0bAesGcmRawBytes:
+    """D11: ``AesGcmResult`` carries the ORIGINAL bytes, not the rendered text.
+
+    Motivation (§1.2): before D11, ``output_text`` is TEXT for UTF-8 input and
+    HEX for non-UTF-8 input, but ``is_utf8`` does not enforce the type. Calling
+    ``bytes.fromhex(output_text)`` on a UTF-8 result silently yields wrong bytes
+    (``"deadbeef"`` -> ``b'\\xde\\xad\\xbe\\xef'``). ``raw_bytes`` removes that trap.
+
+    These tests are the REAL proof for D11 (the ``verify_field_placement.py``
+    script only demonstrated Python dataclass semantics and is removed in F0b).
+    """
+
+    KEY = "kunci-enambelas!"  # 16 bytes -> AES-128
+
+    def test_raw_bytes_pada_deklarasi_field(self):
+        """The field exists and is declared BEFORE the defaulted field."""
+        import dataclasses
+
+        from cryptolab.core.symmetric.aes import AesGcmResult
+
+        names = [f.name for f in dataclasses.fields(AesGcmResult)]
+        assert "raw_bytes" in names
+        assert names.index("raw_bytes") < names.index("status_message")
+
+    def test_raw_bytes_halo_utf8(self):
+        from cryptolab.core.symmetric.aes import aes_gcm_decrypt, aes_gcm_encrypt
+
+        res = aes_gcm_encrypt("halo", self.KEY)
+        back = aes_gcm_decrypt(res.payload, self.KEY)
+        assert back.raw_bytes == b"halo"
+
+    def test_raw_bytes_deadbeef_bukan_hasil_fromhex(self):
+        """The §1.2 trap: 'deadbeef' must round-trip to b'deadbeef', NOT b'\\xde\\xad\\xbe\\xef'."""
+        from cryptolab.core.symmetric.aes import aes_gcm_decrypt, aes_gcm_encrypt
+
+        res = aes_gcm_encrypt("deadbeef", self.KEY)
+        back = aes_gcm_decrypt(res.payload, self.KEY)
+        assert back.raw_bytes == b"deadbeef"
+        assert back.raw_bytes != b"\xde\xad\xbe\xef"
+
+    def test_raw_bytes_urandom_non_utf8(self):
+        from cryptolab.core.symmetric.aes import aes_gcm_decrypt, aes_gcm_encrypt
+
+        pt = os.urandom(64)
+        res = aes_gcm_encrypt(pt, self.KEY)
+        back = aes_gcm_decrypt(res.payload, self.KEY)
+        assert back.raw_bytes == pt
+
+    def test_raw_bytes_kosong(self):
+        from cryptolab.core.symmetric.aes import aes_gcm_decrypt, aes_gcm_encrypt
+
+        res = aes_gcm_encrypt(b"", self.KEY)
+        back = aes_gcm_decrypt(res.payload, self.KEY)
+        assert back.raw_bytes == b""
+
+    @pytest.mark.parametrize("pt", [b"A", b"\xff"])
+    def test_raw_bytes_satu_byte(self, pt):
+        from cryptolab.core.symmetric.aes import aes_gcm_decrypt, aes_gcm_encrypt
+
+        res = aes_gcm_encrypt(pt, self.KEY)
+        back = aes_gcm_decrypt(res.payload, self.KEY)
+        assert back.raw_bytes == pt
+
+    def test_raw_bytes_encrypt_adalah_ciphertext(self):
+        """On encrypt, ``raw_bytes`` == the ciphertext (ct), not the payload string."""
+        from cryptolab.core.symmetric.aes import aes_gcm_encrypt
+
+        res = aes_gcm_encrypt(b"halo", self.KEY)
+        _, ct_hex, _ = res.payload.split(":")
+        assert res.raw_bytes == bytes.fromhex(ct_hex)
+
+    def test_raw_bytes_roundtrip_cocok_dengan_payload(self):
+        """raw_bytes from decrypt == raw_bytes from the matching encrypt."""
+        from cryptolab.core.symmetric.aes import aes_gcm_decrypt, aes_gcm_encrypt
+
+        pt = os.urandom(32)
+        enc = aes_gcm_encrypt(pt, self.KEY)
+        back = aes_gcm_decrypt(enc.payload, self.KEY)
+        assert back.raw_bytes == pt
+
+
+class TestF0bRegresiGcm:
+    """Regression: D11 must NOT change the pre-existing observable behaviour.
+
+    Constants are hard-coded (not dynamically captured) because the values are
+    already known — see spec §6.1 (rev-5).
+    """
+
+    KEY = "kunci-enambelas!"
+
+    def test_output_text_dan_is_utf8_halo(self):
+        from cryptolab.core.symmetric.aes import aes_gcm_encrypt
+
+        res = aes_gcm_encrypt("halo", self.KEY)
+        # On encrypt output_text is always the payload string.
+        assert res.output_text == res.payload
+        assert res.is_utf8 is False
+
+    def test_decrypt_output_text_tetap_teks_untuk_utf8(self):
+        from cryptolab.core.symmetric.aes import aes_gcm_decrypt, aes_gcm_encrypt
+
+        back = aes_gcm_decrypt(aes_gcm_encrypt("deadbeef", self.KEY).payload, self.KEY)
+        assert back.output_text == "deadbeef"
+        assert back.is_utf8 is True
+
+    def test_decrypt_output_text_hex_untuk_non_utf8(self):
+        from cryptolab.core.symmetric.aes import aes_gcm_decrypt, aes_gcm_encrypt
+
+        pt = os.urandom(64)
+        back = aes_gcm_decrypt(aes_gcm_encrypt(pt, self.KEY).payload, self.KEY)
+        # Non-UTF8 output_text == hex of the plaintext (2 x byte length).
+        assert back.output_text == pt.hex()
+        assert len(back.output_text) == 2 * len(pt)
+        assert back.is_utf8 is False
+
+    def test_payload_masih_format_nonce_ct_tag_hex(self):
+        from cryptolab.core.symmetric.aes import aes_gcm_encrypt
+
+        res = aes_gcm_encrypt("pesan", self.KEY)
+        bagian = res.payload.split(":")
+        assert len(bagian) == 3
+        nonce_hex, ct_hex, tag_hex = bagian
+        assert len(bytes.fromhex(nonce_hex)) == 12  # GCM_NONCE_BYTES
+        assert len(bytes.fromhex(tag_hex)) == 16  # GCM_TAG_BYTES
+        assert ct_hex == res.raw_bytes.hex()
+
+    def test_konstruktor_tanpa_raw_bytes_typerror(self):
+        """Sanity: ``raw_bytes`` is non-default, so omitting it is a TypeError."""
+        import pytest as _pytest
+
+        from cryptolab.core.symmetric.aes import AesGcmResult
+
+        with _pytest.raises(TypeError):
+            AesGcmResult(
+                operation="decrypt",
+                key_repr="k",
+                nonce_hex="00",
+                payload="p",
+                output_text="t",
+                is_utf8=True,
+                technical_success=True,
+                # raw_bytes omitted on purpose
+            )
