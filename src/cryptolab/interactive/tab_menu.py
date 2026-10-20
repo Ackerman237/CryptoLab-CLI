@@ -7,13 +7,13 @@ Menu baru tambahan di atas menu lama (bukan pengganti):
 - Mode sempit: bila seluruh tab tidak muat, hanya tab aktif yang tampil.
 - Karakter kotak memakai ``Symbol`` (fallback ASCII otomatis dari ui.theme).
 - Fallback ke menu lama bila stdin/stdout bukan TTY (lihat run_interactive_menu).
-- Item tanpa handler (``target=None``) butuh dependency baru: saat ini hanya
-  Argon2id / bcrypt; Enter menampilkan status "belum tersedia".
-  Mode Tahap 3 lain (SHA-3, SHA-512, HMAC-SHA-256, AES-GCM, Digital
-  Signature, Generate Key) sudah punya handler.
+- Semua item sudah punya handler (Tahap 3 selesai). Kategori "Hash" memuat
+  Argon2id / bcrypt: Argon2id butuh dependency baru (argon2-cffi), jadi opsi
+  yang tersedia adalah bcrypt (bila paket terpasang) atau PBKDF2-SHA256 stdlib.
 """
 from cryptolab.banner import (
-    paint, vlen, term_width, BOLD, DIM, GREEN, CYAN, YELLOW,
+    paint, vlen, term_width, term_height, BOLD, DIM, GREEN, CYAN, YELLOW,
+    HEADER_SUBTITLE, render_header,
 )
 from cryptolab.ui.theme import Symbol
 
@@ -28,6 +28,7 @@ from cryptolab.interactive.handlers.ctx_hashing import (
     fn_sha512,
     fn_hmac256,
     fn_keygen,
+    fn_password,
 )
 from cryptolab.interactive.handlers.ctx_asymmetric import fn_rsa, fn_dh
 
@@ -59,7 +60,7 @@ CATEGORIES = [
         ("SHA-3", fn_sha3, "baru"),
         ("SHA-512", fn_sha512, "baru"),
         ("HMAC-SHA-256", fn_hmac256, "baru"),
-        ("Argon2id / bcrypt", None, "baru"),
+        ("Argon2id / bcrypt", fn_password, "baru"),
     ]),
     ("Encoding", [
         ("Base64", fn_base64, ""),
@@ -77,6 +78,23 @@ HINT_TAB = (
     f"{Symbol.ARROW_LEFT} {Symbol.ARROW_RIGHT} kategori   "
     f"{Symbol.ARROW_UP} {Symbol.ARROW_DOWN} algoritma   Enter pilih   Q keluar"
 )
+
+# Penjelasan singkat tiap kategori (ditampilkan di bawah daftar algoritma).
+CATEGORY_DESC = {
+    "Klasik": "cipher klasik berbasis substitusi dan pergeseran",
+    "Simetris": "enkripsi satu kunci - cepat, kunci harus dirahasiakan",
+    "Asimetris": "pasangan kunci publik/privat untuk enkripsi dan tanda tangan",
+    "Hash": "fungsi satu arah untuk integritas, MAC, dan password",
+    "Encoding": "konversi representasi data, bukan enkripsi",
+    "Utilitas": "analisis otomatis, riwayat, dan pembangkit kunci acak",
+}
+
+
+def _header_lines(width: int, avail_rows: int) -> list:
+    """Logo + subtitle versi, mengecil otomatis bila tinggi terminal terbatas."""
+    if avail_rows < 1:
+        return []
+    return render_header(HEADER_SUBTITLE, max_logo_rows=avail_rows).split("\n")
 
 
 def _center(painted: str, width: int) -> str:
@@ -106,28 +124,72 @@ def _tab_bar(names, ci: int, width: int) -> str:
 
 
 def tab_menu_lines(ci: int, ai: int, status: str = "") -> list:
-    """Bangun seluruh baris layar menu tab: tab + daftar algoritma + footer."""
+    """Bangun seluruh baris layar menu tab.
+
+    Susunan: logo + subtitle versi, tab kategori, daftar algoritma,
+    penjelasan kategori, lalu footer hint.
+
+    Bila tinggi terminal terbatas, bagian yang dipotong lebih dulu (berurutan):
+    baris kosong, penjelasan kategori, logo (mengecil otomatis), dan daftar
+    algoritma. Tab kategori + minimal 3 item + footer selalu tampil.
+    """
     width = term_width()
+    h = term_height()
     names = [name for name, _ in CATEGORIES]
     items = CATEGORIES[ci][1]
 
-    lines = ["", _tab_bar(names, ci, width), _rule(width), ""]
+    head = [_tab_bar(names, ci, width), _rule(width)]
+    desc = CATEGORY_DESC.get(names[ci], "")
+    desc_line = _center(paint(desc, DIM), width)
+    tail = [_rule(width)]
+    if status:
+        tail.append(_center(paint(status, YELLOW), width))
+    tail.append(_center(paint(HINT_TAB, DIM), width))
 
     label_width = max(len(label) for _, group in CATEGORIES for label, _, _ in group)
     pad = max((width - (4 + label_width)) // 2, 0)
-    for i, (label, _target, tag) in enumerate(items):
+
+    def item_line(i, label, tag):
         pointer = f"{Symbol.POINTER} " if i == ai else "  "
         body = paint(f"{pointer}{label}", BOLD) if i == ai else paint(f"{pointer}{label}", DIM)
         if tag == "usang":
             body += "   " + paint(f"{Symbol.WARNING} usang", YELLOW)
         elif tag == "baru":
             body += "   " + paint("baru", GREEN)
-        lines.append(" " * pad + body)
+        return " " * pad + body
 
-    lines += ["", _rule(width)]
-    if status:
-        lines.append(_center(paint(status, YELLOW), width))
-    lines.append(_center(paint(HINT_TAB, DIM), width))
+    # Baris wajib: 2 head + minimal 3 item + garis + footer (+status bila ada).
+    min_items = min(3, len(items))
+    reserved = len(head) + min_items + len(tail)
+    avail = h - reserved
+
+    # Prioritas saat sempit: item (maks semua) -> logo -> penjelasan.
+    show_items = min(len(items), max(avail + 1, min_items))
+    left = max(avail - (show_items - min_items), 0)
+    logo_rows = min(6, max(left - 2, 0)) if left >= 3 else 0
+    show_desc = bool(desc) and (left - logo_rows) >= 1
+
+    def build(with_logo, with_desc):
+        out = []
+        if with_logo:
+            out += _header_lines(width, logo_rows)
+            out.append("")
+        out += head
+        out += [item_line(i, label, tag) for i, (label, _t, tag) in enumerate(items[:show_items])]
+        out.append("")
+        if with_desc:
+            out.append(desc_line)
+        return out + tail
+
+    lines = build(bool(logo_rows), show_desc)
+    if len(lines) > h:
+        # Buang bagian yang tidak wajib sampai muat, footer selalu terlihat.
+        lines = build(bool(logo_rows), False)
+    while len(lines) > h and show_items > min_items:
+        show_items -= 1
+        lines = build(bool(logo_rows), False)
+    if len(lines) > h:
+        lines = build(False, False)
     return lines
 
 
@@ -166,11 +228,7 @@ def run_tab_menu(dispatch, read_key) -> None:
             ci, ai = int(key) - 1, 0
         elif key == "enter":
             label, target = items[ai][:2]
-            if target is None:
-                # Argon2id/bcrypt butuh dependency baru (argon2-cffi/bcrypt),
-                # sementara proyek memakai stdlib + pycryptodome saja.
-                status = f"{label} belum tersedia - butuh dependency baru (argon2-cffi/bcrypt)."
-            elif dispatch(label, target):
+            if dispatch(label, target):
                 return
         elif key in ("q", "esc"):
             return

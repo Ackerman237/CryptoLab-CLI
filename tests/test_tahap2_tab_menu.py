@@ -83,24 +83,21 @@ class TestNavigasiTab:
 
 
 class TestItemBaruTahap3:
-    def test_semua_item_tahap3_sudah_punya_handler_kecuali_argon2(self):
-        # Setelah Tahap 3: hanya Argon2id/bcrypt yang belum punya handler
-        # (butuh dependency baru - lihat laporan Tahap 3).
+    def test_semua_item_sudah_punya_handler(self):
+        # Semua mode Tahap 3 sudah punya handler (Argon2id/bcrypt didegradasi
+        # ke bcrypt/PBKDF2-SHA256 di fn_password).
         tanpa_handler = [
             f"{name}/{label}"
             for name, group in CATEGORIES
             for label, target, _tag in group
             if target is None
         ]
-        assert tanpa_handler == ["Hash/Argon2id / bcrypt"]
+        assert tanpa_handler == []
 
-    def test_item_belum_tersedia_tampilkan_status(self, capsys):
-        # Argon2id / bcrypt (target None): Enter -> status, bukan crash.
-        # Tab Hash: 4 = Hash, item ke-4 = Argon2id / bcrypt.
-        calls, out = _run(["4", "down", "down", "down", "down", "enter", "q"], capsys)
-        assert calls == []
-        assert "Argon2id" in out
-        assert "belum tersedia" in out
+    def test_tanpa_handler_tidak_ada_cabang_status_lagi(self):
+        # Tombol Enter selalu dispatch selama item punya handler.
+        calls, _ = _run(["4", "down", "down", "down", "down", "enter"])
+        assert [c[0] for c in calls] == ["Argon2id / bcrypt"]
 
 
 class TestTampilan:
@@ -110,6 +107,29 @@ class TestTampilan:
         assert "Caesar Cipher" in lines
         assert "Enter pilih" in lines
 
+    def test_header_logo_dan_versi(self):
+        lines = "\n".join(tab_menu_lines(0, 0))
+        assert "CRYPTOLAB CLI v" in lines
+        assert any("█" in l for l in tab_menu_lines(0, 0))
+
+    def test_penjelasan_kategori_ikut_tab_aktif(self):
+        assert "substitusi dan pergeseran" in "\n".join(tab_menu_lines(0, 0))
+        assert "integritas, MAC, dan password" in "\n".join(tab_menu_lines(3, 0))
+
+    def test_muatan_tinggi_terminal_kecil(self, monkeypatch):
+        from cryptolab.interactive import tab_menu as tm
+        monkeypatch.setattr(tm, "term_height", lambda default=24: 14)
+        lines = tm.tab_menu_lines(3, 1)
+        assert len(lines) <= 14
+        assert any("Enter pilih" in l for l in lines)  # footer selalu ada
+
+    def test_tinggi_sangat_kecil_masih_ada_tab_dan_footer(self, monkeypatch):
+        from cryptolab.interactive import tab_menu as tm
+        monkeypatch.setattr(tm, "term_height", lambda default=24: 8)
+        lines = tm.tab_menu_lines(3, 1)
+        assert any("[Hash]" in l for l in lines)
+        assert any("Enter pilih" in l for l in lines)
+
     def test_tag_baru_dan_usang(self):
         lines = "\n".join(tab_menu_lines(1, 0))  # Simetris
         assert "AES-GCM" in lines and "baru" in lines
@@ -118,8 +138,7 @@ class TestTampilan:
     def test_mode_sempit_hanya_tab_aktif(self, monkeypatch):
         from cryptolab.interactive import tab_menu as tm
         monkeypatch.setattr(tm, "term_width", lambda default=80: 40)
-        bar = tm.tab_menu_lines(1, 0)[1]
-        assert "[Simetris]" in bar
+        bar = next(l for l in tm.tab_menu_lines(1, 0) if "[Simetris]" in l)
         assert "(2/6)" in bar
         from cryptolab.banner import vlen
         assert vlen(bar) <= 40

@@ -20,6 +20,7 @@ from cryptolab.core.exceptions import (
     InvalidInputError,
     InvalidKeyError,
     DecodingError,
+    CryptoLabError,
 )
 from cryptolab.core.symmetric.aes import aes_gcm_encrypt, aes_gcm_decrypt
 from cryptolab.interactive.handlers.ctx_hashing import (
@@ -27,6 +28,7 @@ from cryptolab.interactive.handlers.ctx_hashing import (
     fn_sha512,
     fn_hmac256,
     fn_keygen,
+    fn_password,
 )
 from cryptolab.interactive.handlers.ctx_symmetric import fn_aes_gcm
 from cryptolab.interactive.tab_menu import CATEGORIES
@@ -262,6 +264,66 @@ class TestWiringMenuTab:
 
     def test_generate_key_terwire(self):
         assert _items("Utilitas")["Generate Key"] is fn_keygen
+
+    def test_argon2_bcrypt_terwire_ke_fn_password(self):
+        assert _items("Hash")["Argon2id / bcrypt"] is fn_password
+
+
+class TestPasswordMode:
+    """Argon2id mustahil tanpa dep baru; bcrypt opsional; fallback PBKDF2 stdlib."""
+
+    def test_pilihan_default_pbkdf2_bila_bcrypt_tidak_ada(self, monkeypatch):
+        from cryptolab.interactive.handlers import ctx_hashing as ch
+
+        monkeypatch.setattr(ch, "BCRYPT_AVAILABLE", False)
+        ctx = FakeCtx(["PBKDF2-SHA256 (stdlib)", "Buat hash", "password", 100000])
+        res = fn_password(ctx)
+        rows = dict(res.rows)
+        assert rows["Algoritma"] == "PBKDF2-SHA256"
+        assert len(bytes.fromhex(rows["Hash"])) == 32
+        assert "Passw0rd" not in rows["Hash"]
+
+    def test_pbkdf2_verifikasi_cocok_dan_salah(self):
+        ctx = FakeCtx(["PBKDF2-SHA256 (stdlib)", "Buat hash", "password", 100000])
+        rows = dict(fn_password(ctx).rows)
+        salt, digest = rows["Salt (hex)"], rows["Hash"]
+
+        ok = fn_password(FakeCtx(["PBKDF2-SHA256 (stdlib)", "Verifikasi", "password", salt, digest, 100000]))
+        assert dict(ok.rows)["Status"] == "COCOK"
+
+        bad = fn_password(FakeCtx(["PBKDF2-SHA256 (stdlib)", "Verifikasi", "salah", salt, digest, 100000]))
+        assert dict(bad.rows)["Status"] == "TIDAK COCOK"
+        assert bad.note
+
+    def _opsi_password(self, monkeypatch, bcrypt_tersedia):
+        from cryptolab.interactive.handlers import ctx_hashing as ch
+
+        seen = {}
+
+        class Probe(FakeCtx):
+            def choose(self, label, options, default=1):
+                seen.setdefault("opsi", list(options))
+                return super().choose(label, options, default)
+
+        monkeypatch.setattr(ch, "BCRYPT_AVAILABLE", bcrypt_tersedia)
+        try:
+            fn_password(Probe(["HENTIKAN"]))
+        except (CryptoLabError, StopIteration):
+            pass
+        return seen["opsi"]
+
+    def test_bcrypt_tidak_ditawarkan_tanpa_paket(self, monkeypatch):
+        assert self._opsi_password(monkeypatch, False) == ["PBKDF2-SHA256 (stdlib)"]
+
+    def test_bcrypt_ditawarkan_bila_paket_ada(self, monkeypatch):
+        assert self._opsi_password(monkeypatch, True) == ["PBKDF2-SHA256 (stdlib)", "bcrypt"]
+
+    def test_argon2id_tidak_ada_di_kode(self):
+        # Argon2id sengaja tidak diimplementasikan (butuh argon2-cffi).
+        import pathlib
+
+        src = pathlib.Path("src/cryptolab/core/hashing.py").read_text(encoding="utf-8")
+        assert "argon2" not in src.lower()
 
 
 class TestGenerateKey:

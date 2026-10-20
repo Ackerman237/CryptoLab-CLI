@@ -15,6 +15,9 @@ from cryptolab.core.hashing import (
     hmac_compute,
     hmac_verify,
     pbkdf2_hash,
+    pbkdf2_verify,
+    bcrypt_hash,
+    bcrypt_verify,
     generate_random_bytes,
     BCRYPT_AVAILABLE,
 )
@@ -170,6 +173,77 @@ def fn_keygen(ctx):
 
 
 fn_keygen._ctx_fn = True
+
+
+def fn_password(ctx):
+    """Password hashing (Tahap 3).
+
+    Argon2id belum tersedia (butuh dependency baru ``argon2-cffi``); bcrypt
+    tersedia hanya bila paket ``bcrypt`` terpasang. Bila keduanya tidak ada,
+    mode ini mengarahkan ke PBKDF2-SHA256 dari stdlib.
+    """
+    opts = ["PBKDF2-SHA256 (stdlib)"]
+    if BCRYPT_AVAILABLE:
+        opts.append("bcrypt")
+    algo = ctx.choose("Algoritma password", opts, default=1)
+    op = ctx.choose("Operasi", ["Buat hash", "Verifikasi"], default=1)
+
+    if algo == "bcrypt":
+        password = ctx.ask("Password", secret=True)
+        if op == "Buat hash":
+            rounds = ctx.ask("Rounds", default=12, cast=lambda x: _validate_rounds(int(x)))
+            res = ctx.work(f"Bcrypt rounds={rounds}", lambda: bcrypt_hash(password, rounds=rounds))
+            log_history("Bcrypt Hash", "********", res.hash_value[:29] + "...", {"rounds": rounds})
+            return Result([("Algoritma", "bcrypt"), ("Rounds", str(rounds)), ("Hash", res.hash_value)])
+        expected = ctx.ask("Hash bcrypt yang diharapkan")
+        res = ctx.work("Memverifikasi bcrypt", lambda: bcrypt_verify(password, expected))
+        log_history("Bcrypt Verify", "********", str(res.match), {"match": res.match})
+        return Result(
+            [("Algoritma", "bcrypt"), ("Status", "COCOK" if res.match else "TIDAK COCOK")],
+            note="" if res.match else "Password tidak cocok dengan hash.",
+        )
+
+    # PBKDF2-SHA256 (stdlib)
+    password = ctx.ask("Password", secret=True)
+    if op == "Buat hash":
+        iters = ctx.ask("Iterasi", default=600000, cast=lambda x: _validate_iters(int(x)))
+        res = ctx.work(
+            f"PBKDF2-SHA256 ({iters:,} iterasi)".replace(",", "."),
+            lambda: pbkdf2_hash(password, iterations=iters, algorithm="SHA256"),
+        )
+        log_history("PBKDF2-SHA256", "********", res.hash_value[:32] + "...", {"iterations": iters})
+        return Result(
+            [
+                ("Algoritma", "PBKDF2-SHA256"),
+                ("Iterasi", str(iters)),
+                ("Salt (hex)", res.salt),
+                ("Hash", res.hash_value),
+            ],
+            note="Kunci/hash disimpan dengan salt acak dari os.urandom.",
+        )
+
+    salt = ctx.ask("Salt (hex)")
+    expected = ctx.ask("Hash yang diharapkan (hex)")
+    iters = ctx.ask("Iterasi", default=600000, cast=lambda x: _validate_iters(int(x)))
+    res = ctx.work(
+        "Memverifikasi PBKDF2-SHA256",
+        lambda: pbkdf2_verify(password, salt, expected, iterations=iters, algorithm="SHA256"),
+    )
+    status = "COCOK" if res.match else "TIDAK COCOK"
+    log_history("PBKDF2-SHA256 Verify", "********", status, {"iterations": iters, "match": res.match})
+    return Result(
+        [("Algoritma", "PBKDF2-SHA256"), ("Status", status)],
+        note="" if res.match else "Password tidak cocok dengan hash.",
+    )
+
+
+fn_password._ctx_fn = True
+
+
+def _validate_rounds(n):
+    if not 4 <= n <= 31:
+        raise ValueError("rounds harus 4-31")
+    return n
 
 
 def _validate_iters(n):
