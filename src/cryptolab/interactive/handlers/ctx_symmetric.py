@@ -9,11 +9,15 @@ Panduan kunci/IV:
 - RC2: kunci 5-16 byte, IV 8 byte (untuk mode CBC)
 """
 
+import os
+
 from cryptolab.flow import Result
 from cryptolab.core.symmetric.des import des_encrypt, des_decrypt
 from cryptolab.core.symmetric.aes import aes_encrypt, aes_decrypt, aes_gcm_encrypt, aes_gcm_decrypt
 from cryptolab.core.symmetric.rc2 import rc2_encrypt, rc2_decrypt
 from cryptolab.core.utils.history import log_history
+from cryptolab.cli import input as fin
+from cryptolab.core.exceptions import InvalidInputError, DecodingError
 
 
 def fn_des(ctx):
@@ -137,3 +141,157 @@ def fn_rc2(ctx):
 
 
 fn_rc2._ctx_fn = True
+
+
+# ---------------------------------------------------------------------------
+# F4 — "Mode File": enkripsi/dekripsi berkas (GCM/CBC).
+# Memakai ULANG helper cli/input.py (tidak menduplikasi logika I/O/format).
+# ---------------------------------------------------------------------------
+
+
+def _bersihkan_path(raw: str) -> str:
+    """Normalisasi path yang diseret ke terminal.
+
+    Membuang tanda kutip pembungkus ('' atau "") dan spasi tepi, lalu
+    meng-expand ``~``. Mengembalikan path absolut bila memungkinkan.
+    """
+    s = (raw or "").strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in ("'", '"'):
+        s = s[1:-1].strip()
+    s = os.path.expanduser(s)
+    return s
+
+
+def _tanya_path(ctx, label, default=None):
+    return ctx.ask(label, default=default, cast=_bersihkan_path)
+
+
+def fn_mode_file(ctx):
+    """Mode File: enkripsi/dekripsi berkas dengan AES-GCM atau AES-CBC.
+
+    Seluruh I/O berkas, konversi format, dan batas ukuran memakai helper yang
+    SAMA dengan CLI (``cryptolab.cli.input``) supaya tidak ada logika ganda.
+    """
+    op = ctx.choose("Operasi", ["Enkripsi", "Dekripsi"], default=1)
+    algo = ctx.choose("Algoritma", ["AES-GCM (AEAD)", "AES-CBC"], default=1)
+    algoritma = "GCM" if algo.startswith("AES-GCM") else "CBC"
+
+    path_in = _tanya_path(ctx, "Path berkas masukan")
+    fmt = ctx.choose("Format berkas", ["hex", "base64", "raw"], default=1)
+
+    # Kunci (dan IV untuk CBC).
+    key = ctx.ask("Kunci (16/24/32 byte)", secret=True)
+    iv = ""
+    if algoritma == "CBC":
+        if op == "Enkripsi":
+            iv = ctx.ask("IV (tepat 16 karakter)")
+
+    path_out = _tanya_path(
+        ctx, "Path berkas keluaran (kosongkan untuk menampilkan di layar)", default=""
+    )
+
+    if op == "Enkripsi":
+        return _mode_file_enkripsi(ctx, algoritma, path_in, fmt, key, iv, path_out)
+    return _mode_file_dekripsi(ctx, algoritma, path_in, fmt, key, path_out)
+
+
+fn_mode_file._ctx_fn = True
+
+
+def _konfirmasi_timpa(ctx, path_out):
+    """Tanya konfirmasi bila berkas keluaran sudah ada. True = boleh timpa."""
+    if not path_out or not os.path.exists(path_out):
+        return True
+    pilihan = ctx.choose(
+        f"Berkas '{path_out}' sudah ada. Timpa?",
+        ["Tidak (batalkan)", "Ya (timpa)"],
+        default=1,
+    )
+    return pilihan.startswith("Ya")
+
+
+def _mode_file_enkripsi(ctx, algoritma, path_in, fmt, key, iv, path_out):
+    if fmt == "raw" and not path_out:
+        raise InvalidInputError("Format raw butuh berkas keluaran (path --out).")
+
+    data = fin.read_file_bytes(path_in, fin.LIMIT_PLAINTEXT_BYTES)
+
+    if algoritma == "GCM":
+        res = ctx.work("Mengenkripsi berkas (AES-GCM)", lambda: aes_gcm_encrypt(data, key))
+        payload = res.payload
+    else:
+        if not iv:
+            raise InvalidInputError("Mode CBC memerlukan IV (tepat 16 karakter).")
+        res = ctx.work(
+            "Mengenkripsi berkas (AES-CBC)",
+            lambda: aes_encrypt(data, key, mode="CBC", iv=iv),
+        )
+        iv_bytes = iv.encode("utf-8") if isinstance(iv, str) else iv
+        payload = fin.build_cbc_payload(iv_bytes.hex(), res.output_text)
+
+    out = fin.encode_ciphertext(payload, fmt, algoritma)
+
+    rows = [
+        ("Operasi", "Enkripsi berkas"),
+        ("Algoritma", f"AES-{algoritma}"),
+        ("Berkas masukan", f"{path_in} ({len(data)} byte)"),
+        ("Format", fmt),
+        ("Ukuran ciphertext", f"{len(out)} byte"),
+    ]
+    if path_out:
+        if not _konfirmasi_timpa(ctx, path_out):
+            return Result(rows + [("Status", "Dibatalkan; berkas keluaran tidak ditulis.")])
+        ctx.work("Menulis berkas keluaran", lambda: fin.write_output(path_out, out, force=True, source_path=path_in))
+        rows.append(("Berkas keluaran", path_out))
+    else:
+        rows.append(("Ciphertext", out.decode("ascii", errors="replace")))
+
+    log_history("Mode File Encrypt", path_in, path_out or "(stdout)", {"algo": algoritma, "format": fmt})
+    return Result(rows)
+
+
+def _mode_file_dekripsi(ctx, algoritma, path_in, fmt, key, path_out):
+    raw_in = fin.read_decrypt_bytes(path_in, fmt, algoritma)
+    parsed = fin.decode_ciphertext(raw_in, fmt, algoritma)
+
+    if algoritma == "GCM":
+        payload = f"{parsed['nonce_hex']}:{parsed['ct_hex']}:{parsed['tag_hex']}"
+        try:
+            res = ctx.work("Mendekripsi berkas (AES-GCM)", lambda: aes_gcm_decrypt(payload, key))
+        except (DecodingError, InvalidInputError):
+            raise InvalidInputError("Autentikasi gagal: kunci salah, tag rusak, atau data berubah.")
+    else:
+        iv = bytes.fromhex(parsed["iv_hex"]) if "iv_hex" in parsed else None
+        try:
+            res = ctx.work(
+                "Mendekripsi berkas (AES-CBC)",
+                lambda: aes_decrypt(parsed["ct_hex"], key, mode="CBC", iv=iv),
+            )
+        except (DecodingError, InvalidInputError):
+            raise InvalidInputError("Dekripsi gagal: kunci salah atau data rusak.")
+
+    raw_out = res.raw_bytes
+
+    rows = [
+        ("Operasi", "Dekripsi berkas"),
+        ("Algoritma", f"AES-{algoritma}"),
+        ("Berkas masukan", f"{path_in} ({len(raw_in)} byte)"),
+        ("Format", fmt),
+        ("Ukuran plaintext", f"{len(raw_out)} byte"),
+    ]
+
+    if path_out:
+        if not _konfirmasi_timpa(ctx, path_out):
+            return Result(rows + [("Status", "Dibatalkan; berkas keluaran tidak ditulis.")])
+        ctx.work("Menulis berkas keluaran", lambda: fin.write_output(path_out, raw_out, force=True, source_path=path_in))
+        rows.append(("Berkas keluaran", path_out))
+    else:
+        try:
+            rows.append(("Plaintext", raw_out.decode("utf-8")))
+        except UnicodeDecodeError:
+            raise InvalidInputError(
+                "Hasil dekripsi biner (bukan UTF-8). Isi 'Path berkas keluaran' untuk menyimpannya."
+            )
+
+    log_history("Mode File Decrypt", path_in, path_out or "(stdout)", {"algo": algoritma, "format": fmt})
+    return Result(rows)

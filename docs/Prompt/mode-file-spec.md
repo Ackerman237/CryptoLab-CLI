@@ -492,11 +492,10 @@ write_output(path, data: bytes, force=False)
 | **F0** | Karakterisasi jalur `--text`, **teks galat argparse & `--help`**, `--format` parsing | `tests/test_file_mode.py` | Belum ada fitur menu. **Snapshot parser diperbarui sengaja** (§5.0) |
 | **F0b** | **D11**: selipkan `raw_bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor. ✅ **SELESAI** (rev-9) | `tests/test_file_mode.py::TestF0bAesGcmRawBytes` + `TestF0bRegresiGcm` | Satu-satunya sentuhan ke `core/` (§3.1). `aes.py` +3 baris |
 | **F1** | `cli/input.py` + `--file`/`--out`/`--force`/`--format` untuk **AES-GCM & AES-CBC** | §6.1 | Termasuk round-trip biner. **Dipecah F1a+F1b+F1c** (lihat di bawah) |
-| **F4** | Menu interaktif "Mode File" (+ Hash File) | snapshot menu | **PR terpisah** (lihat §12) |
+| **F4** | Menu interaktif "Mode File" (+ Hash File) | snapshot menu | **PR terpisah** (lihat §12). ✅ **SELESAI** — lihat catatan di bawah |
 | **F5** | Docs: `docs/USAGE.md` + README (+ dokumentasi kontrak `hash -f`: `--encoding` diabaikan untuk `file`, `action` menang atas `-t`/`-f`) | — | Menyerap sisa F2 (lihat catatan rev-9) |
 
-> **F2 & F3 dihapus (rev-9).**
-> - **F3 dihapus** atas keputusan reviewer: HMAC di luar scope awal
+> **F2 & F3 dihapus (rev-9).**> - **F3 dihapus** atas keputusan reviewer: HMAC di luar scope awal
 >   ("enkripsi, dekripsi, hash berkas"). `hmac --file` bukan sekadar wiring —
 >   ia butuh keputusan baru (format kunci, streaming per-chunk, batas ukuran).
 >   Dicatat sebagai **X7** agar ide tidak hilang.
