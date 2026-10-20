@@ -239,7 +239,7 @@ def _parse_hex_payload(text: str, algo: str) -> dict:
 
 def _decode_raw(data: bytes, algo: str) -> dict:
     if algo.upper() == "GCM":
-        if len(data) < GCM_OVERHEAD + 1:
+        if len(data) < GCM_OVERHEAD:
             raise InvalidInputError("Berkas raw terpotong (lebih pendek dari nonce+tag).")
         nonce = data[:12]
         tag = data[-16:]
@@ -255,7 +255,7 @@ def _decode_raw(data: bytes, algo: str) -> dict:
 
 def _parse_binary_payload(data: bytes, algo: str) -> dict:
     if algo.upper() == "GCM":
-        if len(data) < GCM_OVERHEAD + 1:
+        if len(data) < GCM_OVERHEAD:
             raise InvalidInputError("Ciphertext GCM terlalu pendek (data terpotong?).")
         nonce = data[:12]
         tag = data[-16:]

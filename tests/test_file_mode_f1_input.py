@@ -208,6 +208,24 @@ class TestDecode:
         with pytest.raises(InvalidInputError, match="terpotong"):
             fin.decode_ciphertext(b"\x00" * 10, "raw", "GCM")
 
+    def test_gcm_kosong_valid_nonce_tag_tanpa_ct(self):
+        """Empty GCM plaintext -> 12+0+16 payload must decode (not "terpotong")."""
+        from cryptolab.core.symmetric.aes import aes_gcm_encrypt
+
+        res = aes_gcm_encrypt(b"", KEY)
+        raw = fin.encode_ciphertext(res.payload, "raw", "GCM")
+        assert len(raw) == 28
+        parsed = fin.decode_ciphertext(raw, "raw", "GCM")
+        assert parsed["ct_hex"] == ""
+
+    def test_gcm_kosong_valid_base64(self):
+        from cryptolab.core.symmetric.aes import aes_gcm_encrypt
+
+        res = aes_gcm_encrypt(b"", KEY)
+        b64 = fin.encode_ciphertext(res.payload, "base64", "GCM")
+        parsed = fin.decode_ciphertext(b64, "base64", "GCM")
+        assert parsed["ct_hex"] == ""
+
     def test_gcm_hex_kurang_bagian(self):
         with pytest.raises(InvalidInputError, match="nonce:ciphertext:tag"):
             fin.decode_ciphertext(b"aa:bb", "hex", "GCM")

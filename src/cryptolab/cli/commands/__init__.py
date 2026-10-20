@@ -23,6 +23,7 @@ from cryptolab.cli.commands.history import handle_history
 from cryptolab.cli.commands.symmetric import (
     handle_des,
     handle_aes,
+    handle_aes_gcm,
     handle_rc2,
 )
 from cryptolab.cli.commands.hashing import (
@@ -59,6 +60,7 @@ __all__ = [
     # Symmetric
     "handle_des",
     "handle_aes",
+    "handle_aes_gcm",
     "handle_rc2",
     # Hashing
     "handle_hash",
