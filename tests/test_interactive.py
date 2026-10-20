@@ -198,9 +198,9 @@ class TestInteractive:
     def test_hex_interactive(self, ui, capsys):
         from cryptolab import handle_hex
 
-        # Encode "Lab" (pemisah default) -> ulangi -> Decode -> kembali.
-        ui.press("enter", "enter", "down", "enter", "b")
-        ui.type("Lab", "", "4c 61 62")
+        # Encode "Lab" -> pilih pemisah (Enter = Spasi) -> ulangi -> Decode -> kembali.
+        ui.press("enter", "enter", "enter", "down", "enter", "b")
+        ui.type("Lab", "4c 61 62")
         handle_hex()
         captured = capsys.readouterr().out
         assert "4c 61 62" in captured
@@ -209,13 +209,34 @@ class TestInteractive:
     def test_binary_interactive(self, ui, capsys):
         from cryptolab import handle_binary
 
-        # Encode "A" (pemisah default) -> ulangi -> Decode -> kembali.
-        ui.press("enter", "enter", "down", "enter", "b")
-        ui.type("A", "", "01000001")
+        # Encode "A" -> pilih pemisah (Enter = Spasi) -> ulangi -> Decode -> kembali.
+        ui.press("enter", "enter", "enter", "down", "enter", "b")
+        ui.type("A", "01000001")
         handle_binary()
         captured = capsys.readouterr().out
         assert "01000001" in captured
         assert "A" in captured
+
+    def test_binary_interactive_pemisah_kustom(self, ui, capsys):
+        from cryptolab import handle_binary
+
+        # Encode -> Kustom -> "10" ditolak (huruf/angka) -> "##" -> kembali.
+        ui.press("enter", "down", "down", "down", "down", "enter", "b")
+        ui.type("Hi", "10", "##")
+        handle_binary()
+        captured = capsys.readouterr().out
+        assert "hanya boleh berupa simbol" in captured
+        assert "01001000##01101001" in captured
+
+    def test_hex_interactive_prefix_0x(self, ui, capsys):
+        from cryptolab import handle_hex
+
+        # Encode -> opsi "Prefix 0x" (hex per byte: "0x48 0x69") -> kembali.
+        ui.press("enter", "down", "down", "down", "down", "enter", "b")
+        ui.type("Hi")
+        handle_hex()
+        captured = capsys.readouterr().out
+        assert "0x48 0x69" in captured
 
     # ============================================================
     # DES

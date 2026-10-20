@@ -39,6 +39,10 @@ def binary_decode(binary_str: str, encoding: str = "utf-8") -> str:
     Accepts space-separated 8-bit groups (e.g. '01001000 01101001') or continuous
     binary strings with length multiple of 8 (e.g. '0100100001101001').
 
+    Since Tahap 1: any non-data character (comma, dot, dash, custom delimiter...)
+    is discarded automatically, because custom delimiters are not allowed to
+    contain the data characters '0' and '1'.
+
     Args:
         binary_str: Binary string containing 0s and 1s.
         encoding: Expected character encoding for output text (default: utf-8).
@@ -56,6 +60,24 @@ def binary_decode(binary_str: str, encoding: str = "utf-8") -> str:
     cleaned = binary_str.strip()
     if len(cleaned) == 0:
         raise InvalidInputError("Input Binary tidak boleh kosong.")
+
+    # Tahap 1: pemisah non-spasi (koma, strip, kustom simbol, campur spasi) ->
+    # buang semua simbol & whitespace, lalu validasi sisa karakter dan panjang bit.
+    # Input yang hanya berisi spasi/tab memakai jalur lama apa adanya
+    # (pesan error identik dengan perilaku lama).
+    if any((not ch.isspace()) and ch not in "01" for ch in cleaned):
+        bits = re.sub(r"[\W_]", "", cleaned)
+        if len(bits) == 0 or not re.fullmatch(r"[01]+", bits):
+            invalid_chars = set(re.findall(r"[^01]", bits)) or set(re.findall(r"[^01]", cleaned))
+            raise DecodingError(
+                f"String biner mengandung karakter tidak valid: {', '.join(sorted(invalid_chars))}"
+            )
+        if len(bits) % 8 != 0:
+            raise DecodingError(
+                f"Panjang string biner ({len(bits)} bit) bukan kelipatan 8 bit."
+            )
+        chunks = [bits[i : i + 8] for i in range(0, len(bits), 8)]
+        return _binary_chunks_to_text(chunks, encoding)
 
     # Check if input is space-separated or delimiter-separated
     tokens = cleaned.split()
@@ -88,6 +110,11 @@ def binary_decode(binary_str: str, encoding: str = "utf-8") -> str:
             )
         chunks = [raw_bin[i : i + 8] for i in range(0, len(raw_bin), 8)]
 
+    return _binary_chunks_to_text(chunks, encoding)
+
+
+def _binary_chunks_to_text(chunks: List[str], encoding: str) -> str:
+    """Convert validated 8-bit chunks to decoded text (shared by both paths)."""
     try:
         raw_bytes = bytes(int(chunk, 2) for chunk in chunks)
     except ValueError as err:

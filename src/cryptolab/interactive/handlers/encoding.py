@@ -14,6 +14,63 @@ from cryptolab.ui import (
 )
 
 
+# ============================================================
+# Tahap 1: pemisah Binary & Hex (menu ▲▼ + Enter, item pertama = default)
+# ============================================================
+
+# (label, nilai)  -- nilai None = Kustom (input manual)
+BIN_DELIMITERS = [
+    ("Spasi (default)", " "),
+    ("Tanpa pemisah", ""),
+    ("Koma", ","),
+    ("Strip", "-"),
+    ("Kustom...", None),
+]
+HEX_DELIMITERS = [
+    ("Spasi (default)", " "),
+    ("Tanpa pemisah", ""),
+    ("Titik dua", ":"),
+    ("Strip", "-"),
+    ("Prefix 0x", "0x"),
+    ("Kustom...", None),
+]
+def pick_delimiter(options):
+    """Pilih pemisah byte via menu navigasi.
+
+    Returns:
+        (delimiter, prefix) -- prefix hanya untuk opsi '0x' Hex, selain itu "".
+        None bila user membatalkan pilihan (kembali).
+    """
+    labels = [label for label, _ in options]
+    idx = navigation_menu(
+        options=labels,
+        title="PILIH PEMISAH BYTE",
+        back_label="Batal",
+    )
+    if idx is None:
+        return None
+
+    value = options[idx][1]
+    if value is None:
+        # Kustom: 1-3 karakter simbol saja (tanpa huruf/angka) supaya decode
+        # auto-detect tetap bisa membedakan pemisah dari data yang salah ketik.
+        while True:
+            raw = Prompt.ask(
+                "Pemisah kustom (Enter = spasi, maks 3 karakter simbol)",
+                allow_empty=True,
+                allow_back=False,
+            )
+            if not raw:
+                return (" ", "")
+            if len(raw) <= 3 and not raw.isalnum():
+                return (raw, "")
+            Message.print_warning("Maks 3 karakter dan hanya boleh berupa simbol (tanpa huruf/angka)")
+    if value == "0x":
+        # Prefix 0x: hex per byte dipisah spasi ("0x48 0x69").
+        return (" ", "0x")
+    return (value, "")
+
+
 def handle_base64() -> None:
     """Interactive handler for Base64 codec."""
     while True:
@@ -101,10 +158,19 @@ def handle_hex() -> None:
                     Message.warning("Teks tidak boleh kosong")
                     continue
 
-                delim = Prompt.ask("Pemisah byte (default: spasi, kosong untuk tanpa spasi)", default=" ", allow_empty=True)
-                delimiter = "" if delim == "" else delim
+                picked = pick_delimiter(HEX_DELIMITERS)
+                if picked is None:
+                    continue  # batal pilih pemisah -> kembali ke menu opsi
+                delimiter, prefix = picked
 
-                out = hex_encode(data, delimiter=delimiter)
+                if prefix:
+                    pairs = hex_encode(data, delimiter=" ").split(" ")
+                    out = delimiter.join(prefix + p for p in pairs)
+                else:
+                    out = hex_encode(data, delimiter=delimiter)
+                extra = {"Kategori": "Encoding", "Pemisah": repr(delimiter)}
+                if prefix:
+                    extra["Prefix"] = prefix
                 card = Panel.result(
                     title="HASIL OPERASI CRYPTOLAB",
                     method="Hexadecimal",
@@ -113,9 +179,12 @@ def handle_hex() -> None:
                     input_text=data,
                     output_text=out,
                     reasons=["Data di-encode ke pasangan byte heksadesimal."],
-                    extra_fields={"Kategori": "Encoding", "Pemisah": repr(delimiter)},
+                    extra_fields=extra,
                 )
-                log_history("Hex Encode", data, out, {"delimiter": delimiter})
+                log_extra = {"delimiter": delimiter}
+                if prefix:
+                    log_extra["prefix"] = prefix
+                log_history("Hex Encode", data, out, log_extra)
             else:
                 data = Prompt.ask("Masukkan string heksadesimal untuk di-decode")
                 if not data:
@@ -171,8 +240,10 @@ def handle_binary() -> None:
                     Message.warning("Teks tidak boleh kosong")
                     continue
 
-                delim = Prompt.ask("Pemisah byte (default: spasi, kosong untuk tanpa spasi)", default=" ", allow_empty=True)
-                delimiter = "" if delim == "" else delim
+                picked = pick_delimiter(BIN_DELIMITERS)
+                if picked is None:
+                    continue  # batal pilih pemisah -> kembali ke menu opsi
+                delimiter, _prefix = picked
 
                 out = binary_encode(data, delimiter=delimiter)
                 card = Panel.result(

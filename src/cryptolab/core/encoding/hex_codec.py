@@ -57,16 +57,25 @@ def hex_decode(hex_str: str, encoding: str = "utf-8") -> str:
         raise InvalidInputError("Input Hexadecimal tidak boleh kosong.")
 
     # Remove optional '0x' or '0X' prefix if at the start
+    # (perilaku lama: '0x' di tengah string TIDAK didukung - lihat baseline Tahap 0)
     if cleaned.startswith(("0x", "0X")):
         cleaned = cleaned[2:]
+    original = cleaned
 
-    # Remove common separators (spaces, colons, dashes)
-    cleaned = re.sub(r"[\s:\-]+", "", cleaned)
+    # Tahap 1: buang semua simbol & whitespace (pemisah umum maupun kustom).
+    # Huruf/angka asing TIDAK dibuang agar input salah seperti "4865ZZ" tetap
+    # menghasilkan error (perilaku lama), dan 'x' prefix ganda tetap terdeteksi.
+    cleaned = re.sub(r"[\W_]", "", cleaned)
 
     if len(cleaned) == 0:
+        invalid_chars = set(re.findall(r"[^0-9a-fA-F]", original)) - set(" \t\r\n")
+        if invalid_chars:
+            raise DecodingError(
+                f"String Hexadecimal mengandung karakter tidak valid: {', '.join(sorted(invalid_chars))}"
+            )
         raise InvalidInputError("Input Hexadecimal tidak boleh kosong.")
 
-    # Validate characters
+    # Validate characters: sisa non-hex hanya boleh 'x'/'X' (prefix di tengah)
     if not re.fullmatch(r"[0-9a-fA-F]+", cleaned):
         invalid_chars = set(re.findall(r"[^0-9a-fA-F]", cleaned))
         raise DecodingError(
