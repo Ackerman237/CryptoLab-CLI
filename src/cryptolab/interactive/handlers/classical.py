@@ -47,7 +47,7 @@ def handle_caesar() -> None:
                 op_name = "Enkripsi" if choice == 0 else "Dekripsi"
                 text = Prompt.ask(f"Masukkan teks untuk {op_name.lower()}")
                 if not text:
-                    Message.warning("Teks tidak boleh kosong")
+                    Message.print_warning("Teks tidak boleh kosong")
                     continue
 
                 shift = Prompt.ask_int("Masukkan nilai shift (bilangan bulat)")
@@ -86,7 +86,7 @@ def handle_caesar() -> None:
             elif choice == 2:
                 text = Prompt.ask("Masukkan ciphertext Caesar")
                 if not text:
-                    Message.warning("Ciphertext tidak boleh kosong")
+                    Message.print_warning("Ciphertext tidak boleh kosong")
                     continue
 
                 candidates = caesar_brute_force(text)
@@ -159,12 +159,12 @@ def handle_vigenere() -> None:
             op_name = "Enkripsi" if choice == 0 else "Dekripsi"
             text = Prompt.ask(f"Masukkan teks untuk {op_name.lower()}")
             if not text:
-                Message.warning("Teks tidak boleh kosong")
+                Message.print_warning("Teks tidak boleh kosong")
                 continue
 
             key = Prompt.ask("Masukkan kata kunci (huruf alfabet A-Z)")
             if not key:
-                Message.warning("Kunci tidak boleh kosong")
+                Message.print_warning("Kunci tidak boleh kosong")
                 continue
             if not all(c.isalpha() for c in key):
                 Message.error("Kunci hanya boleh berisi huruf alfabet tanpa angka atau simbol")
@@ -225,12 +225,12 @@ def handle_playfair() -> None:
             op_name = "Enkripsi" if sel == 0 else "Dekripsi"
             text = Prompt.ask(f"Masukkan teks untuk {op_name.lower()}")
             if not text:
-                Message.warning("Teks tidak boleh kosong")
+                Message.print_warning("Teks tidak boleh kosong")
                 continue
 
             key = Prompt.ask("Masukkan kata kunci (huruf alfabet A-Z)")
             if not key:
-                Message.warning("Kunci tidak boleh kosong")
+                Message.print_warning("Kunci tidak boleh kosong")
                 continue
             if not all(c.isalpha() for c in key):
                 Message.error("Kunci hanya boleh berisi huruf alfabet tanpa angka atau simbol")
@@ -300,12 +300,12 @@ def handle_hill() -> None:
             op_name = "Enkripsi" if sel == 0 else "Dekripsi"
             text = Prompt.ask(f"Masukkan teks untuk {op_name.lower()}")
             if not text:
-                Message.warning("Teks tidak boleh kosong")
+                Message.print_warning("Teks tidak boleh kosong")
                 continue
 
             key = Prompt.ask(f"Masukkan key matrix {size}x{size} (angka 0-25, spasi pemisah)")
             if not key:
-                Message.warning("Key matrix tidak boleh kosong")
+                Message.print_warning("Key matrix tidak boleh kosong")
                 continue
 
             try:
@@ -371,12 +371,12 @@ def handle_affine() -> None:
                 # Brute force
                 text = Prompt.ask("Masukkan ciphertext")
                 if not text:
-                    Message.warning("Ciphertext tidak boleh kosong")
+                    Message.print_warning("Ciphertext tidak boleh kosong")
                     continue
 
                 candidates = affine_brute_force(text)
                 if not candidates:
-                    Message.warning("Tidak ada kandidat valid")
+                    Message.print_warning("Tidak ada kandidat valid")
                     continue
 
                 best = candidates[0]
@@ -398,7 +398,7 @@ def handle_affine() -> None:
             op_name = "Enkripsi" if sel == 0 else "Dekripsi"
             text = Prompt.ask(f"Masukkan teks untuk {op_name.lower()}")
             if not text:
-                Message.warning("Teks tidak boleh kosong")
+                Message.print_warning("Teks tidak boleh kosong")
                 continue
 
             a = Prompt.ask_int("Masukkan a (coprime dengan 26: 1,3,5,7,9,11,15,17,19,21,23,25)", min_val=1, max_val=25)
@@ -472,7 +472,7 @@ def handle_railfence() -> None:
                 # Brute force
                 text = Prompt.ask("Masukkan ciphertext")
                 if not text:
-                    Message.warning("Ciphertext tidak boleh kosong")
+                    Message.print_warning("Ciphertext tidak boleh kosong")
                     continue
 
                 max_rails = Prompt.ask_int("Maksimal rail [10]", default=10, min_val=2, max_val=20)
@@ -481,7 +481,7 @@ def handle_railfence() -> None:
 
                 candidates = railfence_brute_force(text, max_rails)
                 if not candidates:
-                    Message.warning("Tidak ada kandidat valid")
+                    Message.print_warning("Tidak ada kandidat valid")
                     continue
 
                 best = candidates[0]
@@ -507,7 +507,7 @@ def handle_railfence() -> None:
             op_name = "Enkripsi" if sel == 0 else "Dekripsi"
             text = Prompt.ask(f"Masukkan teks untuk {op_name.lower()}")
             if not text:
-                Message.warning("Teks tidak boleh kosong")
+                Message.print_warning("Teks tidak boleh kosong")
                 continue
 
             try:

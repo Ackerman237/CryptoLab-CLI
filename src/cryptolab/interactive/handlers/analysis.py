@@ -27,7 +27,7 @@ def handle_auto_analyze() -> None:
         try:
             ciphertext = Prompt.ask("Masukkan ciphertext atau data yang ingin dianalisis")
             if not ciphertext:
-                Message.warning("Input tidak boleh kosong")
+                Message.print_warning("Input tidak boleh kosong")
                 continue
 
             print("\n  [*] Menganalisis format encoding (Base64, Hex, Binary)...")
@@ -45,7 +45,7 @@ def handle_auto_analyze() -> None:
                 print(Rule.thin())
                 if report.possible_keyed_ciphers:
                     keyed_list = ", ".join(report.possible_keyed_ciphers)
-                    Message.warning(f"Karakteristik data cocok dengan cipher ber-kunci ({keyed_list})")
+                    Message.print_warning(f"Karakteristik data cocok dengan cipher ber-kunci ({keyed_list})")
 
                 key_input = Prompt.ask(
                     "Metode ini mungkin membutuhkan key. Masukkan key jika tersedia, atau Enter untuk melewati",
@@ -66,7 +66,7 @@ def handle_auto_analyze() -> None:
                         if iv_input:
                             iv_bytes_len = len(iv_input.encode("utf-8"))
                             if iv_bytes_len != 16:
-                                Message.warning(f"Panjang IV AES CBC harus tepat 16 byte. Melewati CBC ber-IV.")
+                                Message.print_warning(f"Panjang IV AES CBC harus tepat 16 byte. Melewati CBC ber-IV.")
                             else:
                                 user_iv = iv_input
 
@@ -80,12 +80,12 @@ def handle_auto_analyze() -> None:
                         if iv_input:
                             iv_bytes_len = len(iv_input.encode("utf-8"))
                             if iv_bytes_len != 8:
-                                Message.warning(f"Panjang IV DES CBC harus tepat 8 byte. Melewati CBC ber-IV.")
+                                Message.print_warning(f"Panjang IV DES CBC harus tepat 8 byte. Melewati CBC ber-IV.")
                             else:
                                 user_iv = iv_input
 
                     elif "AES" in report.possible_keyed_ciphers:
-                        Message.warning(f"Panjang key AES-128 harus tepat 16 byte (saat ini: {key_bytes_len}).")
+                        Message.print_warning(f"Panjang key AES-128 harus tepat 16 byte (saat ini: {key_bytes_len}).")
 
                     # Re-run analysis with supplied parameters
                     report = run_auto_analysis(ciphertext, key=user_key, iv=user_iv)
@@ -136,8 +136,8 @@ def handle_auto_analyze() -> None:
                 if not repeat:
                     break
             else:
-                Message.warning("Tidak ditemukan kandidat yang menghasilkan teks terbaca")
-                Message.warning("Ciphertext mungkin menggunakan key yang belum dimasukkan")
+                Message.print_warning("Tidak ditemukan kandidat yang menghasilkan teks terbaca")
+                Message.print_warning("Ciphertext mungkin menggunakan key yang belum dimasukkan")
                 repeat = _post_result_menu("Tidak ada kandidat.", "hasil_auto_analyze.txt")
                 if not repeat:
                     break

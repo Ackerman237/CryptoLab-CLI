@@ -92,7 +92,7 @@ def handle_base64() -> None:
             op_name = "Encode" if choice == 0 else "Decode"
             data = Prompt.ask(f"Masukkan data untuk Base64 {op_name.lower()}")
             if not data:
-                Message.warning("Data tidak boleh kosong")
+                Message.print_warning("Data tidak boleh kosong")
                 continue
 
             if choice == 0:
@@ -155,7 +155,7 @@ def handle_hex() -> None:
             if choice == 0:
                 data = Prompt.ask("Masukkan teks untuk di-encode ke Hex")
                 if not data:
-                    Message.warning("Teks tidak boleh kosong")
+                    Message.print_warning("Teks tidak boleh kosong")
                     continue
 
                 picked = pick_delimiter(HEX_DELIMITERS)
@@ -188,7 +188,7 @@ def handle_hex() -> None:
             else:
                 data = Prompt.ask("Masukkan string heksadesimal untuk di-decode")
                 if not data:
-                    Message.warning("Data heksadesimal tidak boleh kosong")
+                    Message.print_warning("Data heksadesimal tidak boleh kosong")
                     continue
 
                 out = hex_decode(data)
@@ -237,7 +237,7 @@ def handle_binary() -> None:
             if choice == 0:
                 data = Prompt.ask("Masukkan teks untuk di-encode ke Biner")
                 if not data:
-                    Message.warning("Teks tidak boleh kosong")
+                    Message.print_warning("Teks tidak boleh kosong")
                     continue
 
                 picked = pick_delimiter(BIN_DELIMITERS)
@@ -260,7 +260,7 @@ def handle_binary() -> None:
             else:
                 data = Prompt.ask("Masukkan string biner untuk di-decode")
                 if not data:
-                    Message.warning("Data biner tidak boleh kosong")
+                    Message.print_warning("Data biner tidak boleh kosong")
                     continue
 
                 out = binary_decode(data)

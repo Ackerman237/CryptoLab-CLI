@@ -102,7 +102,7 @@ def _handle_hash_compute() -> None:
 
         data = Prompt.ask(f"Masukkan data untuk {algo} hash")
         if not data:
-            Message.warning("Data tidak boleh kosong")
+            Message.print_warning("Data tidak boleh kosong")
             continue
 
         res = hash_compute(data, algorithm=algo, encoding=encoding)
@@ -127,7 +127,7 @@ def _handle_hash_file() -> None:
     while True:
         filepath = Prompt.ask("Masukkan path file")
         if not filepath:
-            Message.warning("Path file tidak boleh kosong")
+            Message.print_warning("Path file tidak boleh kosong")
             continue
 
         algo_sel = navigation_menu(
@@ -186,12 +186,12 @@ def _handle_hash_verify() -> None:
 
         data = Prompt.ask("Masukkan data asli")
         if not data:
-            Message.warning("Data tidak boleh kosong")
+            Message.print_warning("Data tidak boleh kosong")
             continue
 
         expected = Prompt.ask("Masukkan hash yang diharapkan")
         if not expected:
-            Message.warning("Hash yang diharapkan tidak boleh kosong")
+            Message.print_warning("Hash yang diharapkan tidak boleh kosong")
             continue
 
         res = hash_verify_integrity(data, expected, algorithm=algo, encoding=encoding)
@@ -246,11 +246,11 @@ def _handle_hmac() -> None:
             # Compute
             message = Prompt.ask("Masukkan pesan")
             if not message:
-                Message.warning("Pesan tidak boleh kosong")
+                Message.print_warning("Pesan tidak boleh kosong")
                 continue
             key = Prompt.ask("Masukkan kunci rahasia")
             if not key:
-                Message.warning("Kunci tidak boleh kosong")
+                Message.print_warning("Kunci tidak boleh kosong")
                 continue
 
             res = hmac_compute(message, key, algorithm=algo, encoding=encoding)
@@ -273,15 +273,15 @@ def _handle_hmac() -> None:
             # Verify
             message = Prompt.ask("Masukkan pesan")
             if not message:
-                Message.warning("Pesan tidak boleh kosong")
+                Message.print_warning("Pesan tidak boleh kosong")
                 continue
             key = Prompt.ask("Masukkan kunci rahasia")
             if not key:
-                Message.warning("Kunci tidak boleh kosong")
+                Message.print_warning("Kunci tidak boleh kosong")
                 continue
             expected = Prompt.ask("Masukkan HMAC yang diharapkan")
             if not expected:
-                Message.warning("HMAC yang diharapkan tidak boleh kosong")
+                Message.print_warning("HMAC yang diharapkan tidak boleh kosong")
                 continue
 
             match = hmac_verify(message, key, expected, algorithm=algo, encoding=encoding)
@@ -336,7 +336,7 @@ def _handle_pbkdf2() -> None:
             # Hash
             password = Prompt.ask("Masukkan password")
             if not password:
-                Message.warning("Password tidak boleh kosong")
+                Message.print_warning("Password tidak boleh kosong")
                 continue
 
             salt_input = Prompt.ask("Masukkan salt (hex/base64, kosong untuk random)", allow_empty=True)
@@ -371,17 +371,17 @@ def _handle_pbkdf2() -> None:
             # Verify
             password = Prompt.ask("Masukkan password")
             if not password:
-                Message.warning("Password tidak boleh kosong")
+                Message.print_warning("Password tidak boleh kosong")
                 continue
 
             salt = Prompt.ask("Masukkan salt (hex/base64)")
             if not salt:
-                Message.warning("Salt tidak boleh kosong")
+                Message.print_warning("Salt tidak boleh kosong")
                 continue
 
             expected = Prompt.ask("Masukkan hash yang diharapkan")
             if not expected:
-                Message.warning("Hash yang diharapkan tidak boleh kosong")
+                Message.print_warning("Hash yang diharapkan tidak boleh kosong")
                 continue
 
             iterations = Prompt.ask_int("Jumlah iterasi [100000]", default=100000)
@@ -429,7 +429,7 @@ def _handle_bcrypt() -> None:
             # Hash
             password = Prompt.ask("Masukkan password")
             if not password:
-                Message.warning("Password tidak boleh kosong")
+                Message.print_warning("Password tidak boleh kosong")
                 continue
 
             rounds = Prompt.ask_int("Cost factor/rounds (4-31) [12]", default=12, min_val=4, max_val=31)
@@ -456,12 +456,12 @@ def _handle_bcrypt() -> None:
             # Verify
             password = Prompt.ask("Masukkan password")
             if not password:
-                Message.warning("Password tidak boleh kosong")
+                Message.print_warning("Password tidak boleh kosong")
                 continue
 
             expected = Prompt.ask("Masukkan hash bcrypt")
             if not expected:
-                Message.warning("Hash tidak boleh kosong")
+                Message.print_warning("Hash tidak boleh kosong")
                 continue
 
             res = bcrypt_verify(password, expected)

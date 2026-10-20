@@ -79,7 +79,7 @@ def _handle_des_decrypt() -> None:
         try:
             ct_hex = Prompt.ask("Masukkan ciphertext (format heksadesimal)")
             if not ct_hex:
-                Message.warning("Ciphertext heksadesimal tidak boleh kosong")
+                Message.print_warning("Ciphertext heksadesimal tidak boleh kosong")
                 continue
 
             # Warning for ECB mode
@@ -98,13 +98,13 @@ def _handle_des_decrypt() -> None:
                     iv = iv_cand if len(iv_cand.encode("utf-8")) == 8 else None
 
                 if key_val is None:
-                    Message.warning("Key dilewati. Auto analisis memerlukan key. Gunakan mode CBC/ECB manual.")
+                    Message.print_warning("Key dilewati. Auto analisis memerlukan key. Gunakan mode CBC/ECB manual.")
                     continue
 
                 candidates: List[DesResult] = des_auto_analyze(ct_hex, key=key_val, iv=iv)
 
                 if not candidates:
-                    Message.warning("Tidak ada konfigurasi DES yang berhasil secara teknis")
+                    Message.print_warning("Tidak ada konfigurasi DES yang berhasil secara teknis")
                     continue
 
                 top = candidates[0]
@@ -204,7 +204,7 @@ def _handle_des_encrypt() -> None:
     while True:
         plaintext = Prompt.ask("Masukkan plaintext untuk dienkripsi")
         if not plaintext:
-            Message.warning("Plaintext tidak boleh kosong")
+            Message.print_warning("Plaintext tidak boleh kosong")
             continue
 
         mode_sel = navigation_menu(
@@ -278,7 +278,7 @@ def _handle_des_auto_analyze() -> None:
         try:
             ct_hex = Prompt.ask("Masukkan ciphertext heksadesimal")
             if not ct_hex:
-                Message.warning("Ciphertext tidak boleh kosong")
+                Message.print_warning("Ciphertext tidak boleh kosong")
                 continue
 
             key = Prompt.ask("Masukkan key (tepat 8 karakter/byte, Enter untuk skip)", allow_empty=True)
@@ -290,7 +290,7 @@ def _handle_des_auto_analyze() -> None:
                 iv_val = iv_cand if len(iv_cand.encode("utf-8")) == 8 else None
 
             if key_val is None:
-                Message.warning("Key dilewati. DES tidak dapat didekripsi tanpa key.")
+                Message.print_warning("Key dilewati. DES tidak dapat didekripsi tanpa key.")
                 continue
 
             candidates = des_auto_analyze(ct_hex, key=key_val, iv=iv_val)
@@ -312,7 +312,7 @@ def _handle_des_auto_analyze() -> None:
                 if not _post_result_menu(card, "hasil_des_auto.txt"):
                     break
             else:
-                Message.warning("Tidak ada kombinasi DES yang valid dengan parameter tersebut")
+                Message.print_warning("Tidak ada kombinasi DES yang valid dengan parameter tersebut")
 
         except BackToMenu:
             break
@@ -377,7 +377,7 @@ def _handle_aes_decrypt() -> None:
         try:
             ct_hex = Prompt.ask("Masukkan ciphertext (format heksadesimal)")
             if not ct_hex:
-                Message.warning("Ciphertext heksadesimal tidak boleh kosong")
+                Message.print_warning("Ciphertext heksadesimal tidak boleh kosong")
                 continue
 
             # Warning for ECB mode
@@ -396,7 +396,7 @@ def _handle_aes_decrypt() -> None:
                     iv_val = iv_cand if len(iv_cand.encode("utf-8")) == 16 else None
 
                 if key_val is None:
-                    Message.warning("Key dilewati. AES tidak dapat didekripsi tanpa key.")
+                    Message.print_warning("Key dilewati. AES tidak dapat didekripsi tanpa key.")
                     continue
 
                 candidates = aes_auto_analyze(ct_hex, key=key_val, iv=iv_val)
@@ -436,7 +436,7 @@ def _handle_aes_decrypt() -> None:
                     if not _post_result_menu(card, "hasil_aes.txt"):
                         break
                 else:
-                    Message.warning("Tidak ada konfigurasi AES yang berhasil didekripsi")
+                    Message.print_warning("Tidak ada konfigurasi AES yang berhasil didekripsi")
 
             else:
                 mode = "CBC" if mode_sel == 1 else "ECB"
@@ -501,7 +501,7 @@ def _handle_aes_encrypt() -> None:
     while True:
         plaintext = Prompt.ask("Masukkan plaintext untuk dienkripsi")
         if not plaintext:
-            Message.warning("Plaintext tidak boleh kosong")
+            Message.print_warning("Plaintext tidak boleh kosong")
             continue
 
         mode_sel = navigation_menu(
@@ -575,7 +575,7 @@ def _handle_aes_auto_analyze() -> None:
         try:
             ct_hex = Prompt.ask("Masukkan ciphertext heksadesimal")
             if not ct_hex:
-                Message.warning("Ciphertext tidak boleh kosong")
+                Message.print_warning("Ciphertext tidak boleh kosong")
                 continue
 
             key = Prompt.ask("Masukkan key (tepat 16 karakter/byte, Enter untuk skip)", allow_empty=True)
@@ -587,7 +587,7 @@ def _handle_aes_auto_analyze() -> None:
                 iv_val = iv_cand if len(iv_cand.encode("utf-8")) == 16 else None
 
             if key_val is None:
-                Message.warning("Key dilewati. AES tidak dapat didekripsi tanpa key.")
+                Message.print_warning("Key dilewati. AES tidak dapat didekripsi tanpa key.")
                 continue
 
             candidates = aes_auto_analyze(ct_hex, key=key_val, iv=iv_val)
@@ -609,7 +609,7 @@ def _handle_aes_auto_analyze() -> None:
                 if not _post_result_menu(card, "hasil_aes_auto.txt"):
                     break
             else:
-                Message.warning("Tidak ada kombinasi AES yang valid dengan parameter tersebut")
+                Message.print_warning("Tidak ada kombinasi AES yang valid dengan parameter tersebut")
 
         except BackToMenu:
             break
@@ -649,7 +649,7 @@ def handle_rc2() -> None:
             else:
                 text = Prompt.ask("Masukkan ciphertext heksadesimal")
             if not text:
-                Message.warning("Input tidak boleh kosong")
+                Message.print_warning("Input tidak boleh kosong")
                 continue
 
             key = Prompt.ask("Masukkan key RC2 (5-16 byte)")
@@ -667,7 +667,7 @@ def handle_rc2() -> None:
                     iv = iv_input
                 candidates = rc2_auto_analyze(text, key=key, iv=iv)
                 if not candidates:
-                    Message.warning("Tidak ada konfigurasi RC2 yang berhasil")
+                    Message.print_warning("Tidak ada konfigurasi RC2 yang berhasil")
                     continue
                 result = candidates[0]
                 card = Panel.result(
