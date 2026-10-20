@@ -21,7 +21,7 @@ from cryptolab.interactive.handlers.ctx_encoding import fn_base64, fn_hex, fn_bi
 from cryptolab.interactive.handlers.ctx_analysis import fn_auto
 from cryptolab.interactive.handlers.ctx_history import fn_history
 from cryptolab.interactive.handlers.ctx_classical import fn_caesar, fn_vigenere
-from cryptolab.interactive.handlers.ctx_symmetric import fn_des, fn_aes, fn_aes_gcm, fn_rc2
+from cryptolab.interactive.handlers.ctx_symmetric import fn_des, fn_aes, fn_aes_gcm, fn_rc2, fn_mode_file
 from cryptolab.interactive.handlers.ctx_hashing import (
     fn_hash,
     fn_sha3,
@@ -46,6 +46,7 @@ CATEGORIES = [
     ("Simetris", [
         ("AES", fn_aes, ""),
         ("AES-GCM", fn_aes_gcm, "baru"),
+        ("Mode File", fn_mode_file, "baru"),
         ("DES", fn_des, "usang"),
         ("RC2", fn_rc2, "usang"),
     ]),
