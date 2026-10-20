@@ -1,7 +1,7 @@
 """Unit tests for Extended Classical Ciphers (Playfair, Hill, Affine, Rail Fence)."""
 
 import pytest
-from cryptolab.classical import (
+from cryptolab import (
     playfair_encrypt,
     playfair_decrypt,
     hill_encrypt,
@@ -14,7 +14,7 @@ from cryptolab.classical import (
     railfence_brute_force,
     VALID_A_VALUES,
 )
-from cryptolab.exceptions import InvalidInputError, InvalidKeyError
+from cryptolab import InvalidInputError, InvalidKeyError
 
 
 class TestPlayfair:
@@ -302,7 +302,7 @@ class TestRailFence:
 
     def test_format_rail_pattern(self):
         enc = railfence_encrypt("HELLO", 2)
-        from cryptolab.classical.railfence import format_rail_pattern
+        from cryptolab import format_rail_pattern
         formatted = format_rail_pattern(enc.rail_pattern)
         assert "Rail 0" in formatted
         assert "Rail 1" in formatted

@@ -1,18 +1,14 @@
-"""Symmetric cryptography module (RC2, DES, and AES block ciphers)."""
+"""Symmetric cryptography module (RC2, DES, and AES block ciphers). Backward compatibility."""
 
-from cryptolab.symmetric.des import (
+from cryptolab.core.symmetric import (
     des_encrypt,
     des_decrypt,
     des_auto_analyze,
     DesResult,
-)
-from cryptolab.symmetric.aes import (
     aes_encrypt,
     aes_decrypt,
     aes_auto_analyze,
     AesResult,
-)
-from cryptolab.symmetric.rc2 import (
     rc2_encrypt,
     rc2_decrypt,
     rc2_auto_analyze,
@@ -33,4 +29,3 @@ __all__ = [
     "rc2_auto_analyze",
     "Rc2Result",
 ]
-

@@ -1,14 +1,14 @@
 """Unit tests for analysis tools (brute force, format detection, auto-decode)."""
 
 import pytest
-from cryptolab.analysis.brute_force import caesar_brute_force
-from cryptolab.analysis.detect import detect_format
-from cryptolab.analysis.auto_decode import auto_decode
-from cryptolab.analysis.auto_engine import run_auto_analysis
-from cryptolab.encoding.base64_codec import base64_encode
-from cryptolab.encoding.hex_codec import hex_encode
-from cryptolab.encoding.binary_codec import binary_encode
-from cryptolab.exceptions import InvalidInputError
+from cryptolab import caesar_brute_force
+from cryptolab import detect_format
+from cryptolab import auto_decode
+from cryptolab import run_auto_analysis
+from cryptolab import base64_encode
+from cryptolab import hex_encode
+from cryptolab import binary_encode
+from cryptolab import InvalidInputError
 
 
 class TestCaesarBruteForce:
@@ -127,12 +127,12 @@ class TestAutoEngine:
     """Test suite for unified Auto Analyze engine."""
 
     def test_auto_analyze_empty_input(self):
-        from cryptolab.analysis.auto_engine import run_auto_analysis
+        from cryptolab import run_auto_analysis
         with pytest.raises(InvalidInputError):
             run_auto_analysis("")
 
     def test_auto_analyze_base64_flag(self):
-        from cryptolab.analysis.auto_engine import run_auto_analysis
+        from cryptolab import run_auto_analysis
         # "FLAG{sukses_auto_analyze}" in base64:
         # "RkxBR3tzdWtzZXNfYXV0b19hbmFseXplfQ=="
         b64 = "RkxBR3tzdWtzZXNfYXV0b19hbmFseXplfQ=="
@@ -143,7 +143,7 @@ class TestAutoEngine:
         assert report.top_candidate.flag_detected
 
     def test_auto_analyze_caesar(self):
-        from cryptolab.analysis.auto_engine import run_auto_analysis
+        from cryptolab import run_auto_analysis
         # "KHOOR" -> "HELLO" (shift 3)
         report = run_auto_analysis("KHOOR")
         assert report.top_candidate is not None
@@ -151,7 +151,7 @@ class TestAutoEngine:
         assert "HELLO" in report.top_candidate.output_text
 
     def test_auto_analyze_des_detection_and_decryption(self):
-        from cryptolab.analysis.auto_engine import run_auto_analysis
+        from cryptolab import run_auto_analysis
         ct_hex = "5828b071ff8b9fe9f28e2f22bd9c3f21"
 
         # Keyless: detects possible keyed cipher DES
@@ -174,7 +174,7 @@ class TestAutoEngine:
         assert report.top_candidate.output_text == "laboratorium_keamanan_3d"
 
     def test_auto_analyze_vigenere_with_key(self):
-        from cryptolab.analysis.auto_engine import run_auto_analysis
+        from cryptolab import run_auto_analysis
         ct = "LXFOPV"  # ATTACK with LEMON
         report = run_auto_analysis(ct, key="LEMON")
         vig_cand = [c for c in report.candidates if "Vigenere" in c.method]

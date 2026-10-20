@@ -1,8 +1,8 @@
 """Unit tests for Phase 2 CLI commands, options, and flags."""
 
 import pytest
-from cryptolab.cli import create_parser, handle_cli_args
-from cryptolab.utils.history import clear_history, read_history
+from cryptolab import create_parser, handle_cli_args
+from cryptolab import clear_history, read_history
 
 
 class TestCLIPhase2:

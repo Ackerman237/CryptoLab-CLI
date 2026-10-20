@@ -1,7 +1,7 @@
 """Unit tests for Phase 2 Caesar Brute Force enhancements."""
 
 import pytest
-from cryptolab.analysis.brute_force import caesar_brute_force, find_best_candidate
+from cryptolab import caesar_brute_force, find_best_candidate
 
 
 class TestCaesarBruteForcePhase2:

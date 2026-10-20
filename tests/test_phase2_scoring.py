@@ -1,7 +1,7 @@
 """Unit tests for Phase 2 candidate scoring engine."""
 
 import pytest
-from cryptolab.analysis.scoring import calculate_text_score, ScoreResult
+from cryptolab import calculate_text_score, ScoreResult
 
 
 class TestScoringEngine:

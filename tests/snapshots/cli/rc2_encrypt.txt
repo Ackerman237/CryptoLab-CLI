@@ -1,0 +1,17 @@
+PERINGATAN: RC2/ARC2 adalah cipher legacy (deprecated 2015). Gunakan AES untuk sistem baru.
+PERINGATAN: Mode ECB tidak aman untuk data >1 blok (pola plaintext terlihat). Gunakan CBC/GCM.
+======================================================================
+  CRYPTOLAB CLI v1.2.0 - HASIL ENKRIPSI RC2
+======================================================================
+  Operasi     : RC2 (ECB) (ENCRYPT)
+  Mode        : ECB
+  Padding     : PKCS7
+  Effective   : 128 bit
+  Status      : BERHASIL (OK)
+----------------------------------------------------------------------
+  INPUT:
+  Hello World
+----------------------------------------------------------------------
+  OUTPUT:
+  e9597b45f344c040256a968aefaeb652
+======================================================================

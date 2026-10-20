@@ -15,6 +15,27 @@ import readchar
 from readchar import key as readchar_key
 
 from cryptolab import __version__
+from cryptolab.banner import (
+    render_header,
+    term_width,
+    term_height,
+    paint,
+    WHITE,
+    DIM,
+    hide_cursor,
+    show_cursor,
+    render_footer,
+    HINTS_MAIN,
+    HINTS_SUB,
+    center_block,
+    APP_VERSION,
+    format_subtitle,
+    BOLD,
+    warn_weak_hash,
+    warn_ecb_mode,
+    warn_rc2,
+    print_warning,
+)
 from cryptolab.exceptions import (
     CryptoLabError,
     DecodingError,
@@ -64,46 +85,6 @@ from cryptolab.utils.history import log_history, read_history, clear_history, ge
 
 DIVIDER = "-" * 56
 THIN_DIVIDER = "." * 56
-HINTS_MAIN = [("↑↓", "navigasi"), ("enter", "pilih"), ("q", "keluar"), ("?", "bantuan")]
-HINTS_SUB = [("↑↓", "navigasi"), ("enter", "pilih"), ("esc", "kembali"), ("q", "keluar"), ("?", "bantuan")]
-LOGO_LARGE = """\
- ██████ ██████  ██    ██ ██████  ████████  ██████  ██       █████  ██████
-██      ██   ██  ██  ██  ██   ██    ██    ██    ██ ██      ██   ██ ██   ██
-██      ██████    ████   ██████     ██    ██    ██ ██      ███████ ██████
-██      ██   ██    ██    ██         ██    ██    ██ ██      ██   ██ ██   ██
- ██████ ██   ██    ██    ██         ██     ██████  ███████ ██   ██ ██████"""
-
-_PIXEL_FONT = {
-    "C": [".####", "#....", "#....", "#....", ".####"],
-    "R": ["####.", "#...#", "####.", "#..#.", "#...#"],
-    "Y": ["#...#", "#...#", ".#.#.", "..#..", "..#.."],
-    "P": ["####.", "#...#", "####.", "#....", "#...."],
-    "T": ["#####", "..#..", "..#..", "..#..", "..#.."],
-    "O": [".###.", "#...#", "#...#", "#...#", ".###."],
-    "L": ["#....", "#....", "#....", "#....", "#####"],
-    "A": [".###.", "#...#", "#####", "#...#", "#...#"],
-    "B": ["####.", "#...#", "####.", "#...#", "####."],
-}
-
-
-def _build_pixel_logo(word: str) -> str:
-    rows = ["" for _ in range(5)]
-    for index, character in enumerate(word):
-        for row in range(5):
-            rows[row] += _PIXEL_FONT[character][row] + ("." if index < len(word) - 1 else "")
-    rows.append("." * len(rows[0]))
-    output = []
-    for row in range(0, 6, 2):
-        line = ""
-        for top, bottom in zip(rows[row], rows[row + 1]):
-            line += "█" if top == "#" and bottom == "#" else "▀" if top == "#" else "▄" if bottom == "#" else " "
-        output.append(line.rstrip())
-    return "\n".join(output)
-
-
-LOGO_MEDIUM = _build_pixel_logo("CRYPTOLAB")
-LOGO_TINY = "[ CRYPTOLAB ]"
-LOGO = LOGO_MEDIUM
 
 HELP_CATEGORIES = {
     "Navigasi CLI": [
@@ -150,27 +131,6 @@ HELP_CATEGORIES = {
         "Skor readability adalah heuristik; selalu verifikasi hasil dengan konteks challenge.",
     ],
 }
-
-
-def terminal_width(default: int = 80) -> int:
-    """Return the current terminal width for responsive rendering."""
-    return shutil.get_terminal_size((default, 24)).columns
-
-
-def _block_width(text: str) -> int:
-    return max((len(line) for line in text.splitlines()), default=0)
-
-
-def pick_logo(width: int) -> str:
-    for logo in (LOGO_LARGE, LOGO_MEDIUM):
-        if _block_width(logo) <= width:
-            return logo
-    return LOGO_TINY
-
-
-def center_block(text: str, width: int, offset: int = 0) -> str:
-    padding = max((width - _block_width(text)) // 2 + offset, 0)
-    return "\n".join(" " * padding + line for line in text.splitlines())
 
 
 class BackToMenu(Exception):
@@ -228,31 +188,6 @@ def emphasis(text: str) -> str:
 
 def muted(text: str) -> str:
     return color_text(text, "90")
-
-
-def _fit_hints(hints: List[Tuple[str, str]], width: int, gap: int = 3) -> List[Tuple[str, str]]:
-    """Keep the highest-priority footer hints that fit the terminal."""
-    chosen = list(hints)
-    while chosen:
-        plain = (" " * gap).join(f"{key} {label}" for key, label in chosen)
-        if len(plain) <= max(width, 20):
-            return chosen
-        chosen.pop()
-    return []
-
-
-def render_footer(hints: List[Tuple[str, str]], width: Optional[int] = None, gap: int = 3) -> str:
-    """Render compact keyboard hints with emphasized keys and muted labels."""
-    width = width or terminal_width()
-    gap = 1 if width < 40 else gap
-    chosen = _fit_hints(hints, width, gap)
-    plain = (" " * gap).join(f"{key} {label}" for key, label in chosen)
-    styled = (" " * gap).join(
-        f"{emphasis(key)} {muted(label)}" for key, label in chosen
-    )
-    padding = max((width - len(plain)) // 2, 0)
-    divider = "-" * max(20, width - 2)
-    return f"{center_block(divider, width)}\n{' ' * padding}{styled}"
 
 
 def safe_input(prompt: str, allow_back: bool = True) -> str:
@@ -388,7 +323,7 @@ def navigation_menu(
     def render_menu_initial():
         """Initial full render of the menu."""
         nonlocal menu_rendered
-        width = terminal_width()
+        width = term_width()
         if clear_display:
             clear_screen()
         elif menu_rendered:
@@ -417,7 +352,7 @@ def navigation_menu(
     
     def update_selection(old_idx: int, new_idx: int):
         """Update only the selection indicators without full redraw."""
-        width = terminal_width()
+        width = term_width()
         sys.stdout.write("\033[u")
         for i, opt in enumerate(options):
             option_text = opt if len(opt) <= width - 8 else opt[:max(1, width - 11)] + "..."
@@ -1242,7 +1177,7 @@ def _handle_des_decrypt() -> None:
             options=[
                 "Auto (analisis heuristik mode dan padding, key & IV opsional)",
                 "CBC (Cipher Block Chaining - membutuhkan IV 8 byte)",
-                "ECB (Electronic Codebook - tanpa IV)",
+                "ECB (Electronic Codebook - tanpa IV) ⚠️",
             ],
             title="DES DEKRIPSI - Pilih Mode",
             back_label="Kembali ke Menu DES",
@@ -1256,6 +1191,10 @@ def _handle_des_decrypt() -> None:
             if not ct_hex:
                 print(yellow("  [!] Ciphertext heksadesimal tidak boleh kosong."))
                 continue
+
+            # Warning for ECB mode
+            if mode_sel == 2:
+                print_warning(warn_ecb_mode())
 
             if mode_sel == 0:
                 # Auto mode - key and IV are optional
@@ -1381,7 +1320,7 @@ def _handle_des_encrypt() -> None:
         mode_sel = navigation_menu(
             options=[
                 "CBC (Cipher Block Chaining - membutuhkan IV 8 byte) [Default]",
-                "ECB (Electronic Codebook - tanpa IV)",
+                "ECB (Electronic Codebook - tanpa IV) ⚠️",
             ],
             title="DES ENKRIPSI - Pilih Mode",
             back_label="Batal",
@@ -1390,6 +1329,10 @@ def _handle_des_encrypt() -> None:
             break
         
         mode = "CBC" if mode_sel == 0 else "ECB"
+        
+        # Warning for ECB mode
+        if mode == "ECB":
+            print_warning(warn_ecb_mode())
 
         key = safe_input("  Masukkan key (tepat 8 karakter/byte): ")
         if len(key.encode("utf-8")) != 8:
@@ -1497,6 +1440,7 @@ def handle_rc2() -> None:
         print(DIVIDER)
         print("  RC2 hanya untuk praktikum, CTF, dan kompatibilitas data lama.")
         print("  Default effective key length: 128 bit.")
+        print_warning(warn_rc2())
         print(THIN_DIVIDER)
         choice = navigation_menu(
             options=[
@@ -1558,7 +1502,7 @@ def handle_rc2() -> None:
             mode_sel = navigation_menu(
                 options=[
                     "CBC (Cipher Block Chaining - membutuhkan IV 8 byte)",
-                    "ECB (Electronic Codebook - tanpa IV)",
+                    "ECB (Electronic Codebook - tanpa IV) ⚠️",
                 ],
                 title="RC2 - Pilih Mode",
                 back_label="Batal",
@@ -1566,6 +1510,11 @@ def handle_rc2() -> None:
             if mode_sel is None:
                 continue
             mode = "CBC" if mode_sel == 0 else "ECB"
+            
+            # Warning for ECB mode
+            if mode == "ECB":
+                print_warning(warn_ecb_mode())
+            
             if mode == "CBC":
                 iv = safe_input("  Masukkan IV (tepat 8 karakter/byte): ")
                 if len(iv.encode("utf-8")) != 8:
@@ -1669,6 +1618,11 @@ def _handle_hash_compute() -> None:
             break
         algorithms = ["MD5", "SHA1", "SHA256", "SHA512"]
         algo = algorithms[algo_sel]
+
+        # Show warning for weak hash algorithms
+        warning = warn_weak_hash(algo)
+        if warning:
+            print_warning(warning)
 
         enc_sel = navigation_menu(
             options=["Hexadecimal", "Base64"],
@@ -2672,7 +2626,7 @@ def _handle_aes_decrypt() -> None:
             options=[
                 "Auto (analisis heuristik mode dan padding yang valid, key & IV opsional)",
                 "CBC (Cipher Block Chaining - membutuhkan IV 16 byte)",
-                "ECB (Electronic Codebook - tanpa IV)",
+                "ECB (Electronic Codebook - tanpa IV) ⚠️",
             ],
             title="AES DEKRIPSI - Pilih Mode",
             back_label="Kembali ke Menu AES",
@@ -2692,6 +2646,10 @@ def _handle_aes_decrypt() -> None:
                 print(yellow(
                     f"  [Perhatian] Panjang ciphertext ({len(clean_hex)} hex) bukan kelipatan ukuran blok AES (32 hex / 16 byte)."
                 ))
+
+            # Warning for ECB mode
+            if mode_sel == 2:
+                print_warning(warn_ecb_mode())
 
             if mode_sel == 0:
                 # Auto mode - key and IV are optional
@@ -2818,7 +2776,7 @@ def _handle_aes_encrypt() -> None:
         mode_sel = navigation_menu(
             options=[
                 "CBC (Cipher Block Chaining - membutuhkan IV 16 byte) [Default]",
-                "ECB (Electronic Codebook - tanpa IV)",
+                "ECB (Electronic Codebook - tanpa IV) ⚠️",
             ],
             title="AES ENKRIPSI - Pilih Mode",
             back_label="Batal",
@@ -2827,6 +2785,10 @@ def _handle_aes_encrypt() -> None:
             break
         
         mode = "CBC" if mode_sel == 0 else "ECB"
+        
+        # Warning for ECB mode
+        if mode == "ECB":
+            print_warning(warn_ecb_mode())
 
         key = safe_input("  Masukkan key (tepat 16 karakter/byte): ")
         if len(key.encode("utf-8")) != 16:
@@ -3179,6 +3141,93 @@ def handle_history() -> None:
 # MENU UTAMA INTERAKTIF
 # ======================================================================
 
+HEADER_SUBTITLE = format_subtitle()
+
+
+class Menu:
+    """Simple menu container with title and items."""
+
+    def __init__(self, title: str, items: list):
+        self.title = title
+        self.items = items
+
+
+def _clip(text: str, width: int) -> str:
+    """Clip text to width with ellipsis."""
+    return text if len(text) <= width else text[: max(width - 1, 0)] + "…"
+
+
+def render_menu(labels, selected, descs=None, avail_rows=None):
+    """Menu satu kolom: blok dipusatkan, tepi kiri SEJAJAR, ada scroll jika layar pendek."""
+    w = term_width()
+    n = len(labels)
+    label_w = min(max(len(l) for l in labels), max(w - 6, 8))
+    pad = " " * max((w - (2 + label_w)) // 2, 0)
+
+    # viewport
+    rows = n if avail_rows is None else avail_rows
+    if n <= rows:
+        start, end, truncated = 0, n, False
+    else:
+        view = max(rows - 2, 1)  # sisakan 2 baris untuk penanda ↑/↓
+        start = min(max(selected - view // 2, 0), n - view)
+        end, truncated = start + view, True
+
+    lines = []
+    if truncated:
+        lines.append(pad + paint(f"  ↑ {start} lagi", DIM) if start else "")
+    for i in range(start, end):
+        text = _clip(labels[i], label_w)
+        if i == selected:
+            lines.append(pad + paint(f"▸ {text}", BOLD + WHITE))
+        else:
+            lines.append(pad + paint(f"  {text}", DIM))
+    if truncated:
+        left = n - end
+        lines.append(pad + paint(f"  ↓ {left} lagi", DIM) if left else "")
+
+    # deskripsi item terpilih (selalu 2 baris: kosong + teks)
+    desc = (descs[selected] if descs else "") or ""
+    desc = _clip(desc, w - 4)
+    lines.append("")
+    lines.append(" " * max((w - len(desc)) // 2, 0) + paint(desc, DIM) if desc else "")
+    return lines
+
+
+def menu_lines(menu, sel, depth):
+    h = term_height()
+    labels = [it[0] for it in menu.items]
+    descs = [it[2] if len(it) > 2 else "" for it in menu.items]
+    hints = HINTS_SUB if depth > 0 else HINTS_MAIN
+
+    # Total baris = header(logo+3) + 3 (kosong, judul, kosong) + menu + 2 (kosong, deskripsi)
+    #               + 1 (kosong) + 2 (garis + hint) = header + menu + 8
+    want_menu = min(len(labels), 10)
+    logo_rows = max(h - 11 - want_menu, 1)
+    header = render_header(HEADER_SUBTITLE, max_logo_rows=logo_rows).split("\n")
+
+    avail = max(h - len(header) - 8, 3)
+    body = render_menu(labels, sel, descs, avail_rows=avail)
+    lines = header + ["", paint(center_block(menu.title, term_width()), DIM), ""] + body + ["", render_footer(hints)]
+    return lines[:h]
+
+
+def draw_menu(menu, sel, depth, full_clear):
+    screen(menu_lines(menu, sel, depth), full_clear)
+
+
+def screen(lines, full_clear: bool):
+    """Render lines to terminal with optional full clear."""
+    output = []
+    if full_clear:
+        output.append("\033[2J\033[H")
+    else:
+        output.append("\033[H")
+    output.extend(line + "\n" for line in lines)
+    sys.stdout.write("".join(output))
+    sys.stdout.flush()
+
+
 def run_interactive_menu() -> None:
     """Run CryptoLab in a dedicated terminal screen when attached to a TTY."""
     use_alt_screen = bool(getattr(sys.stdout, "isatty", lambda: False)())
@@ -3195,73 +3244,71 @@ def run_interactive_menu() -> None:
 
 def _run_interactive_menu() -> None:
     """Run the interactive menu loop inside the active terminal screen."""
-    while True:
-        sel = navigation_menu(
-            options=[
-                "Auto Analyze",
-                "Caesar Cipher",
-                "Vigenere Cipher",
-                "Playfair Cipher",
-                "Hill Cipher",
-                "Affine Cipher",
-                "Rail Fence Cipher",
-                "DES (Data Encryption Standard - 64 bit)",
-                "AES (Advanced Encryption Standard - 128 bit)",
-                "RC2 (ARC2 - Legacy 64 bit)",
-                "Hashing & Password Security (MD5, SHA, HMAC, PBKDF2, Bcrypt)",
-                "RSA Asymmetric Cryptography (KeyGen, Encrypt, Decrypt, Sign, Verify)",
-                "Diffie-Hellman Key Exchange (DHKE)",
-                "Base64",
-                "Hex",
-                "Binary",
-                "Riwayat",
-            ],
-            title=f"CRYPTOLAB CLI v{__version__} - TOOLKIT KRIPTOGRAFI & ENCODING",
-            back_label="Keluar",
-            allow_back=False,
-            banner=LOGO,
-            banner_responsive=True,
-        )
+    hide_cursor()
+    try:
+        MAIN = Menu("Menu Utama", [
+            ("Auto Analyze",       handle_auto_analyze,    "Deteksi otomatis jenis cipher / encoding dari teks"),
+            ("Caesar Cipher",      handle_caesar,  "Cipher klasik: geser huruf"),
+            ("Vigenere Cipher",    handle_vigenere,     "Cipher klasik: kunci berulang"),
+            ("DES",                handle_des,     "Data Encryption Standard · 64 bit"),
+            ("AES",                handle_aes,     "Advanced Encryption Standard · 128 bit"),
+            ("RC2",                handle_rc2,     "ARC2 · legacy 64 bit"),
+            ("Hashing & Password", handle_hashing,    "MD5, SHA, HMAC, PBKDF2, Bcrypt"),
+            ("RSA",                handle_rsa,     "KeyGen, Encrypt, Decrypt, Sign, Verify"),
+            ("Diffie-Hellman",     handle_dh,      "Pertukaran kunci (DHKE)"),
+            ("Base64",             handle_base64,     "Encode / decode Base64"),
+            ("Hex",                handle_hex,     "Encode / decode Hex"),
+            ("Binary",             handle_binary,     "Encode / decode Binary"),
+            ("Riwayat",            handle_history, "Lihat riwayat operasi"),
+        ])
 
-        if sel is None:
-            print("\n  Terima kasih telah menggunakan CryptoLab CLI. Sampai jumpa!\n")
-            break
+        selected = 0
+        while True:
+            draw_menu(MAIN, selected, depth=0, full_clear=True)
 
-        try:
-            if sel == 0:
-                handle_auto_analyze()
-            elif sel == 10:
-                handle_history()
-                handle_playfair()
-            elif sel == 4:
-                handle_hill()
-            elif sel == 5:
-                handle_affine()
-            elif sel == 6:
-                handle_railfence()
-            elif sel == 7:
-                handle_des()
-            elif sel == 8:
-                handle_aes()
-            elif sel == 9:
-                handle_rc2()
-            elif sel == 10:
-                handle_hashing()
-            elif sel == 11:
-                handle_rsa()
-            elif sel == 12:
-                handle_dh()
-            elif sel == 13:
-                handle_base64()
-            elif sel == 14:
-                handle_hex()
-            elif sel == 15:
-                handle_binary()
-            elif sel == 16:
-                handle_history()
-            elif sel == 17:
+            # Read key
+            k = readchar.readkey()
+            home_key = getattr(readchar_key, "HOME", "\x00G")
+            end_key = getattr(readchar_key, "END", "\x00O")
+            if k == readchar_key.UP:
+                if selected > 0:
+                    selected -= 1
+            elif k == readchar_key.DOWN:
+                if selected < len(MAIN.items) - 1:
+                    selected += 1
+            elif k == home_key:
+                selected = 0
+            elif k == end_key:
+                selected = len(MAIN.items) - 1
+            elif k in (readchar_key.ENTER, '\r', '\n'):
+                action = MAIN.items[selected][1]
+                if action:
+                    draw_menu(MAIN, selected, depth=0, full_clear=False)
+                    action()
+            elif k.lower() == 'q':
                 print("\n  Terima kasih telah menggunakan CryptoLab CLI. Sampai jumpa!\n")
                 break
-        except BackToMenu:
-            continue
+            elif k == '?':
+                # Show help using existing help system
+                draw_menu(MAIN, selected, depth=0, full_clear=False)
+                category_names = list(HELP_CATEGORIES)
+                cat = navigation_menu(
+                    category_names,
+                    title="BANTUAN CRYPTOLAB - PILIH KATEGORI",
+                    allow_back=True,
+                    back_label="Kembali ke menu",
+                    clear_display=False,
+                    help_enabled=False,
+                )
+                if cat is not None:
+                    draw_menu(MAIN, selected, depth=0, full_clear=False)
+                    category_name = category_names[cat]
+                    print("\n  " + category_name.upper())
+                    print()
+                    for item in HELP_CATEGORIES[category_name]:
+                        print("  - " + item)
+                    print("\n  Tekan tombol apa saja untuk kembali ke kategori.")
+                    readchar.readkey()
+    finally:
+        show_cursor()
 

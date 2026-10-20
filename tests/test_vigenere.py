@@ -1,8 +1,8 @@
 """Unit tests for Vigenere Cipher."""
 
 import pytest
-from cryptolab.classical.vigenere import vigenere_encrypt, vigenere_decrypt
-from cryptolab.exceptions import InvalidInputError, InvalidKeyError
+from cryptolab import vigenere_encrypt, vigenere_decrypt
+from cryptolab import InvalidInputError, InvalidKeyError
 
 
 class TestVigenereCipher:

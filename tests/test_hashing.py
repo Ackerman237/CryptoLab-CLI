@@ -1,7 +1,7 @@
 """Unit tests for Hashing module."""
 
 import pytest
-from cryptolab.hashing import (
+from cryptolab import (
     hash_compute,
     hash_file,
     hmac_compute,
@@ -18,7 +18,7 @@ from cryptolab.hashing import (
     SUPPORTED_PBKDF2_ALGOS,
     SUPPORTED_PASSWORD_ALGOS,
 )
-from cryptolab.exceptions import InvalidInputError, DecodingError
+from cryptolab import InvalidInputError, DecodingError
 import tempfile
 import os
 import base64
@@ -145,47 +145,51 @@ class TestPBKDF2:
     """Test PBKDF2 password hashing."""
 
     def test_pbkdf2_sha256(self):
-        res = pbkdf2_hash("password123", iterations=1000)
+        res = pbkdf2_hash("password123", iterations=100000)
         assert res.algorithm == "PBKDF2-SHA256"
         assert res.technical_success
-        assert res.iterations == 1000
+        assert res.iterations == 100000
         assert len(res.salt) == 32  # 16 bytes = 32 hex chars
         assert len(res.hash_value) == 64  # 32 bytes = 64 hex chars
 
     def test_pbkdf2_sha512(self):
-        res = pbkdf2_hash("password123", algorithm="SHA512", iterations=1000)
+        res = pbkdf2_hash("password123", algorithm="SHA512", iterations=100000)
         assert res.algorithm == "PBKDF2-SHA512"
         assert len(res.hash_value) == 64  # dklen=32 default
 
     def test_pbkdf2_custom_salt(self):
         # Provide salt as hex string
         salt_hex = "637573746f6d73616c74313233343536"  # "customsalt123456" in hex
-        res = pbkdf2_hash("pwd", salt=salt_hex, iterations=1000)
+        res = pbkdf2_hash("pwd", salt=salt_hex, iterations=100000)
         assert res.salt == salt_hex
 
     def test_pbkdf2_custom_dklen(self):
-        res = pbkdf2_hash("pwd", iterations=1000, dklen=16)
+        res = pbkdf2_hash("pwd", iterations=100000, dklen=16)
         assert len(res.hash_value) == 32  # 16 bytes = 32 hex chars
 
     def test_pbkdf2_verify_valid(self):
-        hash_res = pbkdf2_hash("mypassword", iterations=1000)
+        hash_res = pbkdf2_hash("mypassword", iterations=100000)
         # Salt is stored as hex, pass it directly
-        verify = pbkdf2_verify("mypassword", hash_res.salt, hash_res.hash_value, iterations=1000)
+        verify = pbkdf2_verify("mypassword", hash_res.salt, hash_res.hash_value, iterations=100000)
         assert verify.match is True
 
     def test_pbkdf2_verify_invalid(self):
-        hash_res = pbkdf2_hash("mypassword", iterations=1000)
-        verify = pbkdf2_verify("wrongpassword", hash_res.salt, hash_res.hash_value, iterations=1000)
+        hash_res = pbkdf2_hash("mypassword", iterations=100000)
+        verify = pbkdf2_verify("wrongpassword", hash_res.salt, hash_res.hash_value, iterations=100000)
         assert verify.match is False
 
     def test_pbkdf2_verify_wrong_iterations(self):
-        hash_res = pbkdf2_hash("mypassword", iterations=1000)
-        verify = pbkdf2_verify("mypassword", hash_res.salt, hash_res.hash_value, iterations=2000)
-        assert verify.match is False
+        # Test that using iterations below minimum raises error
+        hash_res = pbkdf2_hash("mypassword", iterations=100000)
+        try:
+            pbkdf2_verify("mypassword", hash_res.salt, hash_res.hash_value, iterations=50000)
+            assert False, "Should have raised InvalidInputError for iterations < 100000"
+        except InvalidInputError as e:
+            assert "Iterations minimal 100,000" in str(e)
 
     def test_pbkdf2_verify_wrong_algorithm(self):
-        hash_res = pbkdf2_hash("mypassword", algorithm="SHA256", iterations=1000)
-        verify = pbkdf2_verify("mypassword", hash_res.salt, hash_res.hash_value, algorithm="SHA512", iterations=1000)
+        hash_res = pbkdf2_hash("mypassword", algorithm="SHA256", iterations=100000)
+        verify = pbkdf2_verify("mypassword", hash_res.salt, hash_res.hash_value, algorithm="SHA512", iterations=100000)
         assert verify.match is False
 
     def test_pbkdf2_invalid_iterations(self):
@@ -194,10 +198,10 @@ class TestPBKDF2:
 
     def test_pbkdf2_invalid_salt(self):
         with pytest.raises(InvalidInputError):
-            pbkdf2_hash("pwd", salt="short", iterations=1000)
+            pbkdf2_hash("pwd", salt="short", iterations=100000)
 
     def test_pbkdf2_base64_encoding(self):
-        res = pbkdf2_hash("pwd", iterations=1000, encoding="base64")
+        res = pbkdf2_hash("pwd", iterations=100000, encoding="base64")
         assert not res.hash_value.islower()  # base64 has mixed case
 
 

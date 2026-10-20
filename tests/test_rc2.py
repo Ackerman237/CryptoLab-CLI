@@ -2,9 +2,9 @@
 
 import pytest
 
-from cryptolab.cli import create_parser, handle_cli_args
-from cryptolab.exceptions import InvalidInputError, InvalidKeyError
-from cryptolab.symmetric.rc2 import rc2_decrypt, rc2_encrypt
+from cryptolab import create_parser, handle_cli_args
+from cryptolab import InvalidInputError, InvalidKeyError
+from cryptolab import rc2_decrypt, rc2_encrypt
 
 
 CHALLENGE_CIPHERTEXT = "c73ded509ad5c3039cf3cb63ce5448d1ace59962c45889a23ab61bb826eeebf8"

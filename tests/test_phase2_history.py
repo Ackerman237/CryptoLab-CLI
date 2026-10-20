@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 import pytest
-from cryptolab.utils.history import (
+from cryptolab import (
     log_history,
     read_history,
     clear_history,

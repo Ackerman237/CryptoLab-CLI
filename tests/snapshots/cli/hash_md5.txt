@@ -1,0 +1,15 @@
+PERINGATAN: MD5 adalah hash lemah (collision attacks praktis). JANGAN gunakan untuk keamanan.
+======================================================================
+  CRYPTOLAB CLI v1.2.0 - HASIL HASH MD5
+======================================================================
+  Operasi     : MD5 Hash (COMPUTE)
+  Algorithm   : MD5
+  Encoding    : HEX
+  Status      : BERHASIL (OK)
+----------------------------------------------------------------------
+  INPUT:
+  test
+----------------------------------------------------------------------
+  OUTPUT:
+  098f6bcd4621d373cade4e832627b4f6
+======================================================================

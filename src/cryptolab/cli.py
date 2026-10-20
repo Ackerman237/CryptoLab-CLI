@@ -60,6 +60,7 @@ from cryptolab.asymmetric import (
     DHKeyExchangeResult,
 )
 from cryptolab.interactive import run_interactive_menu
+from cryptolab.banner import warn_weak_hash, warn_ecb_mode, warn_rc2, print_warning
 
 
 # UI Formatters designed for terminal clarity & lab screenshot reporting
@@ -1164,6 +1165,10 @@ def handle_cli_args(args: argparse.Namespace) -> int:
             norm_mode = args.mode.upper()
             norm_padding = "PKCS7" if args.padding.upper() == "PKCS7" else "None"
 
+            # Warning for ECB mode
+            if norm_mode == "ECB":
+                print_warning(warn_ecb_mode())
+
             if args.action == "auto":
                 candidates = des_auto_analyze(args.text, key=args.key, iv=args.iv)
                 if not candidates:
@@ -1215,6 +1220,10 @@ def handle_cli_args(args: argparse.Namespace) -> int:
         if args.command == "aes":
             norm_mode = args.mode.upper()
             norm_padding = "PKCS7" if args.padding.upper() == "PKCS7" else "None"
+
+            # Warning for ECB mode
+            if norm_mode == "ECB":
+                print_warning(warn_ecb_mode())
 
             if args.action == "auto":
                 candidates = aes_auto_analyze(args.text, key=args.key, iv=args.iv)
@@ -1269,6 +1278,13 @@ def handle_cli_args(args: argparse.Namespace) -> int:
             norm_padding = "PKCS7" if args.padding.upper() == "PKCS7" else "None"
             effective_keylen = args.effective_keylen
 
+            # Warning for RC2 legacy cipher
+            print_warning(warn_rc2())
+            
+            # Warning for ECB mode
+            if norm_mode == "ECB":
+                print_warning(warn_ecb_mode())
+
             if args.action == "auto":
                 candidates = rc2_auto_analyze(
                     args.text, key=args.key, iv=args.iv, effective_keylen=effective_keylen
@@ -1304,6 +1320,11 @@ def handle_cli_args(args: argparse.Namespace) -> int:
         if args.command == "hash":
             algo = args.algorithm.upper()
             enc = args.encoding.lower()
+
+            # Show warning for weak hash algorithms
+            warning = warn_weak_hash(algo)
+            if warning:
+                print_warning(warning)
 
             if args.action == "compute":
                 if not args.text:

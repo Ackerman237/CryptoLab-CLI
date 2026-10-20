@@ -23,6 +23,10 @@ def main() -> None:
     configure_windows_terminal()
     parser = create_parser()
     args = parser.parse_args()
+    if getattr(args, "ascii_logo", False):
+        from cryptolab.banner import set_ascii_logo
+
+        set_ascii_logo(True)
     exit_code = handle_cli_args(args)
     sys.exit(exit_code)
 

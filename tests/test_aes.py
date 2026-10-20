@@ -1,13 +1,13 @@
 """Unit tests for AES (Advanced Encryption Standard) CBC and ECB modes, padding, and validation."""
 
 import pytest
-from cryptolab.exceptions import (
+from cryptolab import (
     CryptoLabError,
     DecodingError,
     InvalidInputError,
     InvalidKeyError,
 )
-from cryptolab.symmetric.aes import (
+from cryptolab import (
     aes_encrypt,
     aes_decrypt,
     aes_auto_analyze,
@@ -134,7 +134,7 @@ class TestAES:
         assert candidates[0].output_text == plaintext
 
     def test_aes_cli_encrypt_and_decrypt(self, capsys):
-        from cryptolab.cli import create_parser, handle_cli_args
+        from cryptolab import create_parser, handle_cli_args
         parser = create_parser()
 
         # Encrypt
@@ -160,7 +160,7 @@ class TestAES:
         assert "PlaintextAES128" in captured_dec
 
     def test_aes_cli_auto(self, capsys):
-        from cryptolab.cli import create_parser, handle_cli_args
+        from cryptolab import create_parser, handle_cli_args
         parser = create_parser()
 
         enc_res = aes_encrypt("SolusiAutoAES", key="mysecretkey12345", mode="CBC", iv="myivvector123456")

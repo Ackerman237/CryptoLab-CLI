@@ -1,0 +1,15 @@
+PERINGATAN: Mode ECB tidak aman untuk data >1 blok (pola plaintext terlihat). Gunakan CBC/GCM.
+======================================================================
+  CRYPTOLAB CLI v1.2.0 - HASIL ENKRIPSI DES
+======================================================================
+  Operasi     : DES (ECB) (ENCRYPT)
+  Mode        : ECB
+  Padding     : PKCS7
+  Status      : BERHASIL (OK)
+----------------------------------------------------------------------
+  INPUT:
+  Hello World
+----------------------------------------------------------------------
+  OUTPUT:
+  d35264e8079ccaa95d82e3681c83bb77
+======================================================================
