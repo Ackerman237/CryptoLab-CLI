@@ -22,32 +22,68 @@ APP_VERSION = "1.2.0"
 HEADER_SUBTITLE = f"CRYPTOLAB CLI v{APP_VERSION} · TOOLKIT KRIPTOGRAFI & ENCODING"
 
 # ============================================================
-# Logo definitions (SVG-style block pixel font - CRYPTOLAB)
+# Logo definitions (block pixel font - CRYPTOLAB)
 # ============================================================
+# Font blok 5 baris; huruf CRPTOLAB dari matriks 6 kolom (5 glyph + 1 jarak)
+# sehingga SEMUA baris punya lebar identik - tanpa ini tepi kanan bergerigi.
+# Huruf dihasilkan dari matriks di komentar (bukan digambar manual).
 
-# CRYPTOLAB in 5x7 block font, clean and crisp
+# CRYPTOLAB (9 huruf, lebar 62)
 LOGO_LARGE = """\
-██████  ██████  ██    ██ ██████  ████████  ██████  ██       █████  ██████
-██      ██   ██  ██  ██  ██   ██ ██    ██ ██   ██ ██      ██   ██ ██   ██
-██      ██████    ████   ██████  ██    ██ ██████  ██      ███████ ██████
-██      ██   ██    ██    ██      ██    ██ ██   ██ ██      ██   ██ ██   ██
- ██████ ██   ██    ██    ██      ██     ██████  ███████ ██   ██ ██   ██"""
+██████ ██████ ██  ██ ██████ ██████ ██████ ██      ████  █████ 
+██     ██  ██  ████  ██  ██   ██   ██  ██ ██     ██  ██ ██  ██
+██     ██████   ██   ██████   ██   ██  ██ ██     ██████ █████ 
+██     ██  ██   ██   ██       ██   ██  ██ ██     ██  ██ ██  ██
+██████ ██  ██   ██   ██       ██   ██████ ██████ ██  ██ █████ """
 
+# CRYPTO (6 huruf, lebar 41)
 LOGO_MEDIUM = """\
-██████ ██████ ██  ██ ██████ ████████ ██████ ██    █████ ██████
-██     ██  ██ ██ ██  ██  ██ ██    ██ ██     ██   ██ ██   ██
-██     ██████ ████   ██████ ██    ██ █████  ██   ███████ ██████
-██     ██  ██ ██ ██  ██     ██    ██ ██     ██   ██ ██   ██
- ██████ ██  ██ ██  ██ ██     ██     ██████ ███████ ██ ██   ██"""
+██████ ██████ ██  ██ ██████ ██████ ██████
+██     ██  ██  ████  ██  ██   ██   ██  ██
+██     ██████   ██   ██████   ██   ██  ██
+██     ██  ██   ██   ██       ██   ██  ██
+██████ ██  ██   ██   ██       ██   ██████"""
 
+# CRYPT (5 huruf, lebar 34)
 LOGO_SMALL = """\
-██████ ██████ ██  ██ ██████ ████████ ██████
-██     ██  ██ ██ ██  ██  ██ ██    ██ ██   
-██     ██████ ████   ██████ ██    ██ █████ 
-██     ██  ██ ██ ██  ██     ██    ██ ██   
- ██████ ██  ██ ██  ██ ██     ██     ██████"""
+██████ ██████ ██  ██ ██████ ██████
+██     ██  ██  ████  ██  ██   ██  
+██     ██████   ██   ██████   ██  
+██     ██  ██   ██   ██       ██  
+██████ ██  ██   ██   ██       ██  """
 
 LOGO_TINY = "CRYPTOLAB"
+
+# Versi ASCII polos: tidak memakai karakter blok U+2588, sehingga selalu rapi
+# di terminal/konsol yang tidak punya glyph blok (mis. Windows Legacy Console).
+LOGO_ASCII = """\
+  ___ ___ __   __ ___ ___ _____ ___  _    ___ ___
+ / __| _ \\ \\ / /| _ \\_ _|_   _/ _ \\| |  / _ \\ _ )
+| (__|   / \\ V / |  _/| |  | || (_) | |_| (_) | _ \\
+ \\___|_|_\\  |_|  |_| |___| |_| \\___/|____\\___/|___/"""
+
+LOGO_ASCII_MEDIUM = """\
+  ___ ___ __   __ ___ ___ _____
+ / __| _ \\ \\ / /| _ \\_ _|_   _|
+| (__|   / \\ V / |  _/| |  | |
+ \\___|_|_\\  |_|  |_| |___| |_|"""
+
+# Karakter blok dianggap tampil rapi hanya pada lingkungan yang mendukungnya.
+# Set CRYPTOLAB_ASCII_LOGO=1 (atau pakai --ascii-logo) untuk logo ASCII polos.
+import os as _os
+
+_ASCII_ONLY = _os.environ.get("CRYPTOLAB_ASCII_LOGO", "").strip() not in ("", "0", "false", "False")
+
+
+def set_ascii_logo(enabled: bool = True) -> None:
+    """Paksa logo ASCII polos (untuk terminal tanpa glyph blok U+2588)."""
+    global _ASCII_ONLY
+    _ASCII_ONLY = bool(enabled)
+
+
+def ascii_logo_enabled() -> bool:
+    """Apakah logo ASCII polos sedang dipaksa."""
+    return _ASCII_ONLY
 
 # SVG path data for reference (5x7 pixel font for "CRYPTOLAB")
 # Each letter is 5x7 blocks, total width ~53 chars, height 5 lines
@@ -98,19 +134,28 @@ def _block_width(text: str) -> int:
 def center_block(text: str, width: int, offset: int = 0) -> str:
     """Pusatkan blok logo SEBAGAI SATU BLOK.
 
-    Semua baris diberi padding yang sama (berdasarkan lebar blok terlihat),
-    sehingga tepi kiri semua baris sejajar. Ini menggantikan centering per
-    baris yang menyebabkan logo tampak miring/asimetris.
+    Padding kiri dihitung dari tepi TERJAUH kiri glyph (bukan dari spasi
+    bawaan tiap baris), lalu setiap baris digeser dengan padding yang sama.
+    Dengan begitu tepi kiri glyph sejajar untuk semua baris walaupun glyph
+    seperti Y/T memakai spasi di kolom pertamanya (miring ke kanan) dan
+    huruf lain tidak.
     """
     lines = text.splitlines()
     bw = max((vlen(l) for l in lines), default=0)
-    pad = " " * max((width - bw) // 2, 0)
-    return "\n".join(pad + l.ljust(bw) for l in lines)
+    # Leading minimum di seluruh blok: hanya spasi yang dipakai SEMUA baris.
+    common = min((len(l) - len(l.lstrip(" ")) for l in lines if l.strip()), default=0)
+    pad = " " * max((width - bw) // 2 - common, 0)
+    return "\n".join(pad + l for l in lines)
 
 
 def pick_logo(width: int, max_rows: int = 99) -> str:
     """Pick largest logo that fits width AND height."""
-    for logo in (LOGO_LARGE, LOGO_MEDIUM, LOGO_SMALL):
+    order = (
+        (LOGO_ASCII, LOGO_ASCII_MEDIUM, LOGO_TINY)
+        if ascii_logo_enabled()
+        else (LOGO_LARGE, LOGO_MEDIUM, LOGO_SMALL, LOGO_ASCII, LOGO_ASCII_MEDIUM, LOGO_TINY)
+    )
+    for logo in order:
         if _block_width(logo) <= width and len(logo.splitlines()) <= max_rows:
             return logo
     return LOGO_TINY

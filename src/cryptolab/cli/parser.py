@@ -21,6 +21,11 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Nonaktifkan pencatatan riwayat operasi ke file lokal",
     )
+    parser.add_argument(
+        "--ascii-logo",
+        action="store_true",
+        help="Pakai logo ASCII polos (untuk terminal tanpa glyph blok U+2588)",
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Perintah yang tersedia", required=False)
 
