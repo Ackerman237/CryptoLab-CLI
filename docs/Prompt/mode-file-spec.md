@@ -1,7 +1,7 @@
 # Spec: Mode File (Enkripsi/Dekripsi/Hash Berkas)
 
-**Status:** APPROVED (revisi 7) — di-merge lewat PR #4
-**Tanggal:** 2026-10-20 (revisi 7)
+**Status:** APPROVED (revisi 8) — di-merge lewat PR #4; rev-8 adalah koreksi fakta pasca-F0
+**Tanggal:** 2026-10-20 (revisi 8)
 **Target:** `main` pasca-PR #3 (`abe1e4f`)
 **Prinsip:** 1 step = 1 commit · scope = spec ini saja · no behavior change untuk jalur teks (kecuali yang dinyatakan) · no new deps (stdlib only) · `core/` **tidak disentuh** kecuali penambahan field D11 (`raw_bytes` di `AesGcmResult`, §3.1)
 
@@ -18,6 +18,7 @@
 | 5 | Perkuat bukti pemanggilan (§3.1): `git grep -rn "AesGcmResult(" -- src tests` (cakupan `src` **dan** `tests`), bukan regex lokal; catat batas bukti skrip (*dataclass tiruan*). Tes F0b pakai **konstanta** (bukan snapshot dinamis). Hapus item tes "cek via review kode" (tak eksekutabel; kasus `"deadbeef"` sudah menjaganya). Nyatakan status `verify_*.py` (bukan dikoleksi pytest). |
 | 6 | Rapikan sisa rev-3 di header/§3 (kini rev-6); hapus ambiguitas **F2 vs F3** di §6; koreksi panjang hex F0b (`os.urandom(64)` → **128** char, bukan 62+); catat hasil cek `pyproject.toml` (`python_files` tidak diubah → `verify_*.py` tetap tidak dikoleksi); tandai `verify_field_placement.py` sebagai bukti semantik saja, dilipat/hapus setelah F0b. |
 | 7 | Koreksi §6.3 butir 3: kasus `-t` + `-f` bersama **tidak mungkin** direkam di F0 (opsi `-f` belum ada → pesan saat ini `unrecognized arguments`). F0 merekam perilaku apa adanya; `-t` + `-f` + pembaruan snapshot dipindah ke F1. |
+| 8 | **Koreksi berdasarkan temuan F0** (§1.3): `hash` **sudah** punya `-f/--file` + `--encoding` → F2 = **selaraskan** (bukan tambah), kontrak §1.3a dikunci. Kebijakan eksklusivitas **per perintah** (`required=True` hanya untuk 17 perintah ber-`-t`-wajib; `hash`/`rsa` → `required=False`, galat tetap di handler). Cakupan F1 = **hanya AES-GCM & AES-CBC** (churn snapshot kecil). F3 **didefinisikan ulang** (sisa kandidat: `hmac`; else hapus). Catat bahwa `rsa encrypt`/`hash compute` gagal di **handler**, bukan argparse. |
 
 **Verifikasi core (diminta reviewer):** dicek langsung, lihat §1.1, §1.2, dan
 `tests/file_mode/verify_core_bytes.py` (skrip pembuktian yang bisa dijalankan).
@@ -104,6 +105,47 @@ Karena itu **D11** memutuskan menambah `raw_bytes` (§3.1) agar penyamaan dengan
   Sebelum D11 diimplementasi, pakai jalur `is_utf8` di atas — **jangan** `output_text` mentah.
   Perbedaan ini **wajib** ditangani di `cli/input.py`, bukan diseragamkan di core.
 
+### 1.3 Temuan F0 — asumsi spec yang meleset (KOREKSI rev-8) ⚠️
+
+Menulis tes karakterisasi F0 (`tests/test_file_mode.py`, 74 tes aditif, nol perubahan
+`src/`) mengungkap empat fakta yang **bertentangan dengan asumsi spec rev-1..7**.
+Semua diverifikasi langsung ke kode + empiris, dan dikunci sebagai tes.
+
+**a. `hash` SUDAH punya `-f/--file`** (`cli/parser.py:359`), plus `--encoding`
+(:365) dan `action` dengan pilihan `file` (:352). Spec mengasumsikan `-f`
+diperkenalkan di F1 — **bukan clean slate**. F2 bukan "tambah", melainkan
+**"selaraskan"**.
+
+**Kontrak `hash -f` yang sudah dipakai pengguna** (diverifikasi; tidak boleh
+diubah diam-diam oleh F1/F2):
+
+| Aspek | Perilaku saat ini | Bukti |
+|---|---|---|
+| Baca berkas | **streaming 8 KB**, bukan read-all | `core/hashing.py:186` (`iter(lambda: f.read(8192), b"")`) |
+| Fungsi | `hash_file()` dipanggil **langsung** | `cli/commands/hashing.py:61` |
+| Berkas tidak ada | handler → `"Gagal membaca file"` ke stderr, **exit 1** | `hash_file` membungkus `OSError` |
+| Direktori | sama: `OSError` → `"Gagal membaca file"`, exit 1 | idem |
+| `--encoding` | **diabaikan** untuk `file` (output tetap hex) | `render_box` hanya Algorithm+File; output identik dengan/tanpa `--encoding base64` |
+| `-t` + `-f` bersama | **belum** saling eksklusif; `action` yang menang | `compute` → pakai teks; `file` → pakai berkas |
+
+> Bandingkan: `hash compute` **menghormati** `--encoding` (digest hex hilang saat
+> base64). Perbedaan `file` vs `compute` ini sengaja dikunci sebagai kontrak.
+
+**b. Hanya 17 dari 24 sub-perintah yang WAJIB `-t`.** `hash` dan `rsa` punya `-t`
+**opsional** (yang `required` adalah `action`). Asumsi "semua perintah teks butuh
+`-t`" **salah** → implikasi untuk §5.0 (lihat koreksi kebijakan group di sana).
+
+**c. `rsa encrypt` tanpa `-t` gagal di HANDLER** (exit 1,
+`"Encrypt memerlukan --text / -t."`), **bukan** argparse. `rsa encrypt -t Hello`
+masih gagal karena butuh `--pubkey`. Jangan berasumsi galat selalu dari argparse.
+
+**d. `hash compute` tanpa `-t` gagal di HANDLER** (kotak error, exit 1),
+bukan usage.
+
+> Konsekuensi: klaim "`InvalidInputError` hanya untuk galat runtime berkas"
+> (§5.0/§5.1) **tidak akurat untuk `hash`/`rsa`** — di sana handler tetap
+> menangani "input tidak ada" seperti sekarang (lihat §5.0 koreksi group).
+
 ---
 
 ## 2. Ruang Lingkup
@@ -120,7 +162,7 @@ Karena itu **D11** memutuskan menambah `raw_bytes` (§3.1) agar penyamaan dengan
 | S6 | **Dekripsi ke berkas biner** — inti tujuan fitur |
 | S7 | Menu interaktif "Mode File" (D8) |
 | S8 | Pesan galat berkas yang ramah |
-| S9 | `hash --file` (memakai `hash_file` yang sudah ada, **tanpa batas 10 MB**) |
+| S9 | `hash --file` — **SUDAH ADA** (`-f/--file` di `parser.py:359`), tinggal **diselaraskan** dengan opsi baru (lihat koreksi rev-8) |
 
 ### Tidak termasuk (out-of-scope, sengaja ditunda)
 
@@ -248,14 +290,19 @@ disetujui** karena menyamakan asimetri dan mencegah kelas bug §1.2.
 ## 4. Perubahan yang Direncanakan (per berkas)
 
 > Belum ada kode diubah. Prediksi ini akan dikoreksi saat implementasi.
+>
+> **Koreksi rev-8 (temuan §1.3):** `hash` **sudah** punya `-f/--file` dan
+> `--encoding`. F1 **hanya** menyentuh parser **AES-GCM & AES-CBC** (2 dari 17
+> perintah ber-`-t`-wajib). Parser 15 perintah lain **tidak** berubah → churn
+> snapshot sangat kecil. `hash` hanya **diselaraskan** (bukan ditambahi `-f`).
 
 | Berkas | Perubahan |
 |--------|-----------|
-| `src/cryptolab/cli/parser.py` | Ganti `required=True` pada `-t` dengan `add_mutually_exclusive_group(required=True)`; tambah `-f`, `-o`, `--force`, `--format` |
+| `src/cryptolab/cli/parser.py` | **Hanya AES-GCM & AES-CBC**: ganti `required=True` pada `-t` dengan `add_mutually_exclusive_group(required=True)`; tambah `-f`, `-o`, `--force`, `--format`. Perintah lain **tidak disentuh** |
 | `src/cryptolab/cli/input.py` **(baru)** | `read_input`, `read_file_bytes`, `write_output`, konversi format, `payload` CBC/GCM |
 | `src/cryptolab/core/symmetric/aes.py` | **HANYA D11**: selipkan field `raw_bytes: bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor (`:407`, `:488`). Tidak ada perubahan logika kripto, `output_text`, atau `is_utf8`. |
 | `src/cryptolab/cli/commands/symmetric.py` | Pakai `cli/input.py`; jalur `--text` tetap identik |
-| `src/cryptolab/cli/commands/hashing.py` | `hash --file` → **`hash_file()` langsung** (bukan `read_input`) |
+| `src/cryptolab/cli/commands/hashing.py` | `hash --file` **sudah** memanggil `hash_file()` langsung (hashing.py:61) — **diselaraskan** dengan opsi baru, **tidak** mengubah kontrak §1.3a (streaming, galat, `--encoding` diabaikan) |
 | `src/cryptolab/interactive/handlers/ctx_symmetric.py` | Handler "Mode File" |
 | `src/cryptolab/interactive/handlers/ctx_hashing.py` | Handler "Hash File" |
 | `src/cryptolab/interactive/tab_menu.py` | Item baru di `CATEGORIES` |
@@ -272,9 +319,25 @@ disetujui** karena menyamakan asimetri dan mencegah kelas bug §1.2.
 
 ### 5.0 Parsing argumen (menutup masalah 4) — **KOREKSI rev-3**
 
-**Opsi terpilih: `add_mutually_exclusive_group(required=True)`.** Tetap yang terbersih:
-validasi di parse-time (exit code 2) dan "keduanya sekaligus" ditolak argparse tanpa
-kode manual.
+**Opsi terpilih: `add_mutually_exclusive_group` — tetapi jenis group berbeda per
+perintah (KOREKSI rev-8).**
+
+Rev-1..7 mengasumsikan satu aturan global `required=True`. Temuan F0 (§1.3b)
+menunjukkan itu **salah**: hanya 17 dari 24 perintah yang `-t`-nya wajib. Untuk
+`hash` dan `rsa` yang wajib adalah `action`, dan `-t` opsional — di sana group
+harus `required=False` dan galat "tanpa input" tetap ditangani **handler**
+seperti sekarang (§1.3c/d).
+
+| Perintah | `-t` wajib? | Jenis group | "Tanpa input" |
+|---|---|---|---|
+| AES-GCM, AES-CBC (F1) | ya | `required=True` | argparse, exit 2 (pesan baru §5.0) |
+| 15 perintah `-t`-wajib lain | ya | tidak disentuh di F1 | — |
+| `hash` | tidak (yang wajib `action`) | `required=False` | handler, exit 1 (seperti sekarang) |
+| `rsa` | tidak (yang wajib `action`) | `required=False` | handler, exit 1 (seperti sekarang) |
+
+**Cakupan F1 hanya AES-GCM & AES-CBC.** Dari 17 perintah ber-`-t`-wajib, hanya
+**dua** yang disentuh. Parser perintah lain tidak berubah → churn snapshot sangat
+kecil (lihat §4, §5.0).
 
 > ⚠️ **Koreksi klaim rev-2.** Rev-2 menulis "pesan galat 'tanpa input' tidak berubah".
 > **Itu salah.** Group memang menjaga parse-time & exit code, tetapi teksnya berubah:
@@ -303,13 +366,28 @@ untuk sub-perintah terkait, tes itu **akan gagal** dan **harus diperbarui**.
 Ketiganya direkam **sebelum** F1, supaya diff-nya terlihat dan disetujui, bukan
 ditemukan setelah tes merah.
 
+> **Koreksi rev-8 untuk butir 3.** Rev-7 menyatakan kasus `-t` + `-f` "tidak
+> mungkin direkam di F0" karena `-f` belum ada. Setelah temuan §1.3a, itu **tidak
+> berlaku untuk `hash`**: `-f` sudah ada, sehingga `-t` + `-f` bersamaan **memang
+> direkam di F0** (`TestF0HashFileKontrak`): keduanya belum saling eksklusif dan
+> `action` menentukan mana yang dipakai. Untuk perintah selain `hash`, `-f` belum
+> ada → butir 3 ditambahkan di F1 saat `-f` diperkenalkan (diff snapshot di commit
+> F1 itulah dokumentasinya).
+
 Akibatnya `InvalidInputError` di §5.1 **hanya** untuk galat runtime berkas
 (tidak ada, bukan berkas, terlalu besar, izin), bukan untuk "tidak ada input".
 
 ```python
+# Perintah yang -t-nya wajib (mis. AES-GCM/CBC di F1, dan 15 lainnya saat disentuh):
 grup = parser.add_mutually_exclusive_group(required=True)
 grup.add_argument("-t", "--text")
 grup.add_argument("-f", "--file")
+
+# Perintah yang yang-wajib adalah action, bukan teks (hash, rsa):
+#   group TIDAK required; "tanpa input" tetap galat handler seperti sekarang.
+grup = parser.add_mutually_exclusive_group(required=False)
+grup.add_argument("-t", "--text", default=None)
+grup.add_argument("-f", "--file", default=None)
 ```
 
 ### 5.1 Membaca input
@@ -414,8 +492,8 @@ write_output(path, data: bytes, force=False)
 | **F0** | Karakterisasi jalur `--text`, **teks galat argparse & `--help`**, `--format` parsing | `tests/test_file_mode.py` | Belum ada fitur menu. **Snapshot parser diperbarui sengaja** (§5.0) |
 | **F0b** | **D11**: selipkan `raw_bytes` sebelum `status_message` (Opsi B, §3.1) + isi di 2 konstruktor | `tests/test_tahap3_modes.py` (kasus §6.1 GCM + regresi `output_text`/`is_utf8`/`payload`) | Satu-satunya sentuhan ke `core/` (§3.1) |
 | **F1** | `cli/input.py` + `--file`/`--out`/`--force`/`--format` untuk **AES-GCM & AES-CBC** | §6.1 | Termasuk round-trip biner |
-| **F2** | `hash --file` → `hash_file` **langsung** (streaming 8 KB, **tanpa** batas 10 MB) | hash berkas besar (>10 MB) lolos | Lihat §6.2. Berisi satu perintah saja (hash) |
-| **F3** | Perluas `--file`/`--format` ke perintah lain yang relevan + dokumentasi `--format` | round-trip per perintah | **Tanpa DES/RC2** (X2) |
+| **F2** | **Selaraskan** `hash --file` (yang **sudah ada**) dengan opsi baru (`-o`, eksklusivitas `-t`) **tanpa** mengubah kontrak §1.3a | kontrak §1.3a tetap hijau (streaming, galat, `--encoding` diabaikan) | Lihat §6.2. Bukan "tambah `-f`" — sudah ada |
+| **F3** | **Didefinisikan ulang (rev-8)**: hanya `hmac` (satu-satunya kandidat sisa di luar X2 yang belum jelas). Bila reviewer menilai `hmac` tidak relevan, **hapus F3** dan cukup andalkan dokumentasi `--format` di F5 | `hmac --file` round-trip (bila dikerjakan) | X2 melarang DES/RC2/RSA/klasik; `hash` sudah di F2 → **tidak ada** perintah lain selain `hmac` |
 | **F4** | Menu interaktif "Mode File" (+ Hash File) | snapshot menu | **PR terpisah** (lihat §12) |
 | **F5** | Docs: `docs/USAGE.md` + README | — | — |
 
@@ -483,22 +561,30 @@ Snapshot `--help` dan teks galat argparse mudah rapuh. Aturan saat merekam:
    Rekomendasi: normalisasi + tes yang hanya mengunci **substring stabil**
    (`is required`, `not allowed with argument`), bukan seluruh blok usage.
 3. **Pembagian F0 vs F1 untuk kasus `-t` + `-f` bersama (koreksi rev-6 → rev-7):**
-   - **F0 merekam perilaku APA ADANYA pada kode yang belum berubah.** Karena `-f`
-     belum ada, `-t` + `-f` saat ini menghasilkan `unrecognized arguments: -f`.
-     Jadi F0 **tidak** merekam pesan `not allowed with argument` (tidak mungkin).
+   - **F0 merekam perilaku APA ADANYA pada kode yang belum berubah.** Untuk
+     perintah **selain `hash`**, `-f` belum ada, sehingga `-t` + `-f` saat ini
+     menghasilkan `unrecognized arguments: -f` → tidak direkam di F0.
+     **Pengecualian `hash` (rev-8, §1.3a):** karena `-f` sudah ada, `-t` + `-f`
+     **memang direkam di F0** (`TestF0HashFileKontrak`).
      F0 merekam: (a) tanpa `-t`, (b) `--help`, (c) `-t` saja → **semua hijau**.
-   - **F1** menambahkan kasus `-t` + `-f` (pesan `argument -f/--file: not allowed with
-     argument -t/--text`) **dan** memperbarui secara sengaja snapshot "tanpa input"
-     serta baris usage. **Diff snapshot di commit F1 itulah dokumentasi perubahan**
-     yang disetujui di §5.0.
+   - **F1** menambahkan kasus `-t` + `-f` untuk perintah lain (pesan
+     `argument -f/--file: not allowed with argument -t/--text`) **dan**
+     memperbarui secara sengaja snapshot "tanpa input" serta baris usage.
+     **Diff snapshot di commit F1 itulah dokumentasi perubahan** yang disetujui
+     di §5.0.
 4. Untuk tiap sub-perintah, F0 rekam: (a) tanpa `-t`, (b) `--help`, (c) `-t` saja.
-   Kasus `-t` + `-f` ditambahkan di F1 (lihat butir 3).
+   Kasus `-t` + `-f` ditambahkan di F1 (kecuali `hash`, lihat butir 3).
 
-### 6.2 `hash --file` (perbaikan rev-2)
+### 6.2 `hash --file` (**DISELARASKAN** — koreksi rev-8)
 
-- `hash --file` memanggil `hash_file(filepath, algorithm)` **langsung**
-  (`core/hashing.py:169`) — **bukan** lewat `read_input`.
+- `hash --file` **sudah ada** (`-f/--file`, `parser.py:359`) dan **sudah**
+  memanggil `hash_file(filepath, algorithm)` **langsung** (`core/hashing.py:169`,
+  dipanggil dari `cli/commands/hashing.py:61`) — **bukan** lewat `read_input`.
 - Karena `hash_file` sudah streaming 8 KB, **tidak ada batas 10 MB** untuk hash.
+- **F2 = menyelaraskan, bukan menambahkan.** Kontrak yang sudah dipakai (§1.3a:
+  streaming, galat `"Gagal membaca file"`, `--encoding` diabaikan untuk `file`,
+  `action` menang atas `-t`/`-f`) **tidak boleh berubah diam-diam**; dikunci di
+  `TestF0HashFileKontrak`.
 - Ini dinyatakan eksplisit agar wiring tidak salah memakai batas read-all.
 - Jalur `hash --text` tetap identik.
 
@@ -586,8 +672,11 @@ Disetujui pemilik proyek: **D1, D2, D3′ (default hex), D5 (GCM+CBC), D6, D7, D
 **D4** disetujui bersyarat — syarat "batas simetris per-format" dipenuhi §5.3.
 Rev-2: **D9** (tanpa auto-detect), **D10** (dekripsi non-UTF8 tanpa `--out` = galat).
 Rev-3: **D11** (`raw_bytes` pada `AesGcmResult`, opsi 1).
+Rev-8: koreksi fakta pasca-F0 (§1.3) — `hash` sudah punya `-f`; kebijakan group per
+perintah; cakupan F1 = AES-GCM/CBC; F3 didefinisikan ulang. **D1–D11 tidak berubah.**
 
-**Status dokumen:** **APPROVED (revisi 7)** — dipasang saat merge PR #4, sesuai rencana.
+**Status dokumen:** **APPROVED (revisi 8)** — rev-8 adalah koreksi fakta (bukan
+perubahan keputusan desain) setelah F0; label APPROVED dari PR #4 tetap berlaku.
 
 ---
 
