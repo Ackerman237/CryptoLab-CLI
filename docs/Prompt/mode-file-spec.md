@@ -1,6 +1,6 @@
 # Spec: Mode File (Enkripsi/Dekripsi/Hash Berkas)
 
-**Status:** DRAFT — label APPROVED dipasang **saat merge** (lihat §10)
+**Status:** APPROVED (revisi 7) — di-merge lewat PR #4
 **Tanggal:** 2026-10-20 (revisi 7)
 **Target:** `main` pasca-PR #3 (`abe1e4f`)
 **Prinsip:** 1 step = 1 commit · scope = spec ini saja · no behavior change untuk jalur teks (kecuali yang dinyatakan) · no new deps (stdlib only) · `core/` **tidak disentuh** kecuali penambahan field D11 (`raw_bytes` di `AesGcmResult`, §3.1)
@@ -587,7 +587,7 @@ Disetujui pemilik proyek: **D1, D2, D3′ (default hex), D5 (GCM+CBC), D6, D7, D
 Rev-2: **D9** (tanpa auto-detect), **D10** (dekripsi non-UTF8 tanpa `--out` = galat).
 Rev-3: **D11** (`raw_bytes` pada `AesGcmResult`, opsi 1).
 
-**Status dokumen:** DRAFT. Label APPROVED dipasang **saat merge**, bukan sebelumnya.
+**Status dokumen:** **APPROVED (revisi 7)** — dipasang saat merge PR #4, sesuai rencana.
 
 ---
 
