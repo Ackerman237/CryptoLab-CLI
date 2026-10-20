@@ -144,6 +144,44 @@ class TestTampilan:
         assert vlen(bar) <= 40
 
 
+class TestHierarkiVisual:
+    """Logo/elemen utama tebal-terang, teks sekunder (footer, penjelasan,
+    tab non-aktif) diredupkan agar bedanya langsung terlihat."""
+
+    def _lines(self):
+        from cryptolab.interactive import tab_menu as tm
+        return tm.tab_menu_lines(3, 1)
+
+    def test_logo_tebal_terang(self):
+        from cryptolab.banner import BOLD, WHITE
+        logo = next(l for l in self._lines() if "█" in l)
+        assert BOLD in logo and WHITE in logo
+
+    def test_footer_diredupkan_bukan_tebal(self):
+        from cryptolab.banner import GREY, BOLD
+        footer = next(l for l in self._lines() if "Enter pilih" in l)
+        assert GREY in footer and BOLD not in footer
+
+    def test_penjelasan_kategori_diredupkan(self):
+        from cryptolab.banner import GREY, BOLD
+        desc = next(l for l in self._lines() if "integritas" in l)
+        assert GREY in desc and BOLD not in desc
+
+    def test_item_terpilih_tebal_item_lain_redup(self):
+        from cryptolab.banner import BOLD, GREY, WHITE
+        lines = self._lines()
+        selected = next(l for l in lines if "SHA-3" in l)
+        other = next(l for l in lines if "SHA-512" in l)
+        assert BOLD in selected and WHITE in selected
+        assert GREY in other and BOLD not in other
+
+    def test_tab_aktif_tebal_tab_lain_redup(self):
+        from cryptolab.banner import BOLD, GREY
+        bar = next(l for l in self._lines() if "[Hash]" in l)
+        assert BOLD in bar  # tab aktif
+        assert GREY in bar  # tab non-aktif di baris yang sama
+
+
 class TestIntegrasiRunInteractiveMenu:
     @staticmethod
     def _press(monkeypatch, *keys):

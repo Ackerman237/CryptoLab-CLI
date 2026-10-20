@@ -13,7 +13,7 @@ Menu baru tambahan di atas menu lama (bukan pengganti):
 """
 from cryptolab.banner import (
     paint, vlen, term_width, term_height, BOLD, DIM, GREEN, CYAN, YELLOW,
-    HEADER_SUBTITLE, render_header,
+    WHITE, GREY, render_header, format_subtitle,
 )
 from cryptolab.ui.theme import Symbol
 
@@ -91,10 +91,16 @@ CATEGORY_DESC = {
 
 
 def _header_lines(width: int, avail_rows: int) -> list:
-    """Logo + subtitle versi, mengecil otomatis bila tinggi terminal terbatas."""
+    """Logo + subtitle versi, mengecil otomatis bila tinggi terminal terbatas.
+
+    ``logo_text`` dipatok ke lebar ini supaya ``render_header`` tidak memanggil
+    ``pick_logo`` lagi (pemilihan ukuran sudah dilakukan lewat ``avail_rows``).
+    """
     if avail_rows < 1:
         return []
-    return render_header(HEADER_SUBTITLE, max_logo_rows=avail_rows).split("\n")
+    return render_header(
+        format_subtitle(), max_logo_rows=avail_rows
+    ).split("\n")
 
 
 def _center(painted: str, width: int) -> str:
@@ -103,22 +109,23 @@ def _center(painted: str, width: int) -> str:
 
 
 def _rule(width: int) -> str:
-    return paint("  " + Symbol.BOX_H * max(width - 4, 0), DIM)
+    # Pemisah paling samar: hanya pembantu baca, bukan konten.
+    return paint("  " + Symbol.BOX_H * max(width - 4, 0), GREY)
 
 
 def _tab_bar(names, ci: int, width: int) -> str:
     """Baris tab: penuh bila muat, mode sempit bila tidak."""
     inner = Symbol.BOX_V.join(
-        paint(f"[{name}]", BOLD + CYAN) if i == ci else paint(f" {name} ", DIM)
+        paint(f"[{name}]", BOLD + CYAN) if i == ci else paint(f" {name} ", GREY)
         for i, name in enumerate(names)
     )
-    bar = f"  {Symbol.ARROW_LEFT}  {inner}  {Symbol.ARROW_RIGHT}  "
+    bar = f"  {paint(Symbol.ARROW_LEFT, GREY)}  {inner}  {paint(Symbol.ARROW_RIGHT, GREY)}  "
     if vlen(bar) <= width - 2:
         return _center(bar, width)
     # Mode sempit: hanya tab aktif, sesuai spesifikasi.
     narrow = (
-        f"  {Symbol.ARROW_LEFT} {paint(f'[{names[ci]}]', BOLD + CYAN)} "
-        f"({ci + 1}/{len(names)}) {Symbol.ARROW_RIGHT}  "
+        f"  {paint(Symbol.ARROW_LEFT, GREY)} {paint(f'[{names[ci]}]', BOLD + CYAN)} "
+        f"({ci + 1}/{len(names)}) {paint(Symbol.ARROW_RIGHT, GREY)}  "
     )
     return _center(narrow, width)
 
@@ -140,18 +147,18 @@ def tab_menu_lines(ci: int, ai: int, status: str = "") -> list:
 
     head = [_tab_bar(names, ci, width), _rule(width)]
     desc = CATEGORY_DESC.get(names[ci], "")
-    desc_line = _center(paint(desc, DIM), width)
+    desc_line = _center(paint(desc, GREY), width)
     tail = [_rule(width)]
     if status:
         tail.append(_center(paint(status, YELLOW), width))
-    tail.append(_center(paint(HINT_TAB, DIM), width))
+    tail.append(_center(paint(HINT_TAB, GREY), width))
 
     label_width = max(len(label) for _, group in CATEGORIES for label, _, _ in group)
     pad = max((width - (4 + label_width)) // 2, 0)
 
     def item_line(i, label, tag):
         pointer = f"{Symbol.POINTER} " if i == ai else "  "
-        body = paint(f"{pointer}{label}", BOLD) if i == ai else paint(f"{pointer}{label}", DIM)
+        body = paint(f"{pointer}{label}", BOLD + WHITE) if i == ai else paint(f"{pointer}{label}", GREY)
         if tag == "usang":
             body += "   " + paint(f"{Symbol.WARNING} usang", YELLOW)
         elif tag == "baru":

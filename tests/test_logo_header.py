@@ -139,6 +139,43 @@ class TestRenderHeader:
         finally:
             b.set_ascii_logo(False)
 
+    def test_subtitle_diredupkan_logo_ditebalkan(self):
+        # Hierarki visual: logo BOLD+WHITE, subtitle grey - harus beda gaya.
+        out = b.render_header(b.HEADER_SUBTITLE)
+        lines = out.split("\n")
+        logo_line = next(l for l in lines if "█" in l)
+        sub_line = next(l for l in lines if "CRYPTOLAB CLI v" in l)
+        assert b.BOLD in logo_line and b.WHITE in logo_line
+        assert b.GREY in sub_line
+        assert b.BOLD not in sub_line and b.WHITE not in sub_line
+
+
+class TestFormatSubtitle:
+    def test_subtitle_final_tidak_menyisakan_placeholder(self):
+        # Regresi: HEADER_SUBTITLE pernah jadi template mentah sehingga
+        # render_header menampilkan "{version}" apa adanya.
+        assert "{" not in b.HEADER_SUBTITLE
+        assert b.APP_VERSION in b.HEADER_SUBTITLE
+
+    def test_template_dan_hasil_final_sama(self):
+        assert b.format_subtitle() == b.HEADER_SUBTITLE
+
+    def test_tanpa_dev_saat_versi_sama_dengan_rilis(self):
+        out = b.format_subtitle(dev=False)
+        assert "(dev)" not in out
+        assert "CRYPTOLAB CLI v" in out
+
+    def test_dengan_dev_saat_diminta(self):
+        out = b.format_subtitle(dev=True)
+        assert out.endswith("(dev)")
+
+    def test_versi_kustom_dipakai(self):
+        assert "v9.9.9" in b.format_subtitle(version="9.9.9")
+
+    def test_dev_otomatis_dari_perbandingan_versi(self):
+        # Versi lokal == rilis terakhir -> bukan build pengembangan.
+        assert b.development_build() is False
+
 
 class TestCliFlag:
     def test_parser_menerima_ascii_logo(self):
@@ -152,3 +189,47 @@ class TestCliFlag:
 
         args = create_parser().parse_args([])
         assert args.ascii_logo is False
+
+
+class TestThemeSinkron:
+    """Regresi: ui/theme.py punya salinan logo sendiri yang menyimpang dari
+    banner.py (huruf C hilang). Sekarang theme harus memakai sumber yang sama."""
+
+    def test_logo_blok_identik_dengan_banner(self):
+        from cryptolab.ui import theme as t
+
+        # theme memilih varian sesuai dukungan Unicode terminal; bandingkan
+        # terhadap varian yang sama di banner, bukan selalu versi blok.
+        pairs = (
+            ("LOGO_LARGE", b.LOGO_LARGE),
+            ("LOGO_MEDIUM", b.LOGO_MEDIUM),
+            ("LOGO_SMALL", b.LOGO_SMALL),
+        )
+        for name, expected in pairs:
+            got = getattr(t, name)
+            # theme boleh jatuh ke ASCII di non-TTY; itu tetap harus salah satu
+            # varian resmi dari banner (tidak boleh salinan mandiri).
+            assert got.splitlines() in (
+                expected.splitlines(),
+                b.LOGO_ASCII.splitlines(),
+                b.LOGO_ASCII_MEDIUM.splitlines(),
+            ), name
+
+    def test_logo_small_tersedia(self):
+        from cryptolab.ui import theme as t
+
+        assert hasattr(t, "LOGO_SMALL")
+
+    def test_pick_logo_theme_menghormati_mode_ascii(self):
+        from cryptolab.ui import theme as t
+
+        b.set_ascii_logo(True)
+        try:
+            assert "█" not in t.pick_logo(120)
+        finally:
+            b.set_ascii_logo(False)
+
+    def test_pick_logo_theme_lebar_sempit(self):
+        from cryptolab.ui import theme as t
+
+        assert t.pick_logo(5) == t.LOGO_TINY

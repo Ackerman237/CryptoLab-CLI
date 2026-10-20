@@ -29,6 +29,12 @@ class Color:
     BLUE = "\033[34m"
     MAGENTA = "\033[35m"
 
+    # Nada redup untuk hierarki visual: logo utama terang, teks sekunder (footer,
+    # hint, penjelasan) lebih samar. Grey (bright black) lebih halus dari DIM
+    # sehingga beda terang/redup terlihat jelas di tema terang maupun gelap.
+    GREY = "\033[90m"
+    MUTED = "\033[90m"
+
     @classmethod
     def _enabled(cls) -> bool:
         if not hasattr(sys.stdout, "isatty") or not sys.stdout.isatty():
@@ -83,7 +89,12 @@ class Color:
 
     @classmethod
     def muted(cls, text: str) -> str:
-        return cls.apply(text, cls.DIM)
+        return cls.apply(text, cls.MUTED)
+
+    @classmethod
+    def faint(cls, text: str) -> str:
+        """Lebih samar dari ``muted``: DIM + grey, untuk hint sekunder."""
+        return cls.apply(text, cls.DIM, cls.GREY)
 
 
 class Symbol:
@@ -237,45 +248,22 @@ class Width:
 # ============================================================
 # Logo definitions (progressive sizes - block style)
 # ============================================================
+# Logo TIDAK disalin manual di sini: salinan lama pernah menyimpang dari
+# banner.py (huruf C hilang, lebar baris tidak rata). Satu sumber kebenaran
+# ada di banner.py; nama lama tetap diekspor agar pemakai lama tidak pecah.
+from cryptolab.banner import (  # noqa: E402
+    LOGO_LARGE as _BANNER_LOGO_LARGE,
+    LOGO_MEDIUM as _BANNER_LOGO_MEDIUM,
+    LOGO_SMALL as _BANNER_LOGO_SMALL,
+    LOGO_ASCII as _BANNER_LOGO_ASCII,
+    LOGO_ASCII_MEDIUM as _BANNER_LOGO_ASCII_MEDIUM,
+)
 
-# Large block-style CRYPTOLAB logo (5 lines) - matches banner.py
-_LOGO_LARGE_UNI = """\
-██████  ██████  ██    ██ ██████  ████████  ██████  ██       █████  ██████
-██      ██   ██  ██  ██  ██   ██ ██    ██ ██   ██ ██      ██   ██ ██   ██
-██      ██████    ████   ██████  ██    ██ ██████  ██      ███████ ██████
-██      ██   ██    ██    ██      ██    ██ ██   ██ ██      ██   ██ ██   ██
- ██████ ██   ██    ██    ██      ██     ██████  ███████ ██   ██ ██   ██"""
-
-# Medium block-style logo (3 lines) - condensed version
-_LOGO_MEDIUM_UNI = """\
-██████ ██████ ██  ██ ██████ ████████ ██████ ██    █████ ██████
-██     ██  ██ ██ ██  ██  ██ ██    ██ ██     ██   ██ ██   ██
-██     ██████ ████   ██████ ██    ██ █████  ██   ███████ ██████
-██     ██  ██ ██ ██  ██     ██    ██ ██     ██   ██ ██   ██
- ██████ ██  ██ ██  ██ ██     ██     ██████ ███████ ██ ██   ██"""
-
-# Small logo for very narrow terminals
-_LOGO_SMALL_UNI = """\
-██████ ██████ ██████ ██    ██ ███████ ██████
-██     ██  ██ ██   ██ ██  ██ ██      ██   ██
-█████  ██████ ██████ ██████ █████   ██████
-██     ██  ██ ██   ██ ██ ██ ██      ██   ██
-██████ ██  ██ ██      ████  ███████ ██   ██"""
-
-# ASCII fallback matching the geometric shape of the SVG logo.
-_LOGO_LARGE_ASCII = """\
-  ####  ####  ####  ####  ####  ####  ####  ####  ####
- #      #      #  #  #      #      #  #  #  #  #      #
- #      ####   ####  ####   #      ####  #  #  ####   #
- #      #      # #   #      #      #  #  #  #  #      #
-  ####  ####  #  #  ####    ####  #  #  #  #  ####   #"""
-
-_LOGO_MEDIUM_ASCII = """\
- #### #### #  # #### ###### ####  #   #### ####
- #    #  # # # #  #   #   #  # # # #     #  #
- ####  #### ####   ####   ####  #  #  ###  ####
- #    #  # # # #  #   #   #  # # # #     #  #
- #### #  # #  # ####    ####  #   #### #  #"""
+_LOGO_LARGE_UNI = _BANNER_LOGO_LARGE
+_LOGO_MEDIUM_UNI = _BANNER_LOGO_MEDIUM
+_LOGO_SMALL_UNI = _BANNER_LOGO_SMALL
+_LOGO_LARGE_ASCII = _BANNER_LOGO_ASCII
+_LOGO_MEDIUM_ASCII = _BANNER_LOGO_ASCII_MEDIUM
 
 LOGO_TINY = "CRYPTOLAB"
 
@@ -299,14 +287,27 @@ def _unicode_supported() -> bool:
 if _unicode_supported():
     LOGO_LARGE = _LOGO_LARGE_UNI
     LOGO_MEDIUM = _LOGO_MEDIUM_UNI
+    LOGO_SMALL = _LOGO_SMALL_UNI
 else:
     LOGO_LARGE = _LOGO_LARGE_ASCII
     LOGO_MEDIUM = _LOGO_MEDIUM_ASCII
+    LOGO_SMALL = _LOGO_SMALL_UNI
+
+# Alias ASCII polos (tanpa glyph blok), sama seperti banner.py.
+LOGO_ASCII = _LOGO_LARGE_ASCII
+LOGO_ASCII_MEDIUM = _LOGO_MEDIUM_ASCII
 
 
 def pick_logo(width: int, max_rows: int = 99) -> str:
     """Pick largest logo that fits width AND height."""
-    for logo in (LOGO_LARGE, LOGO_MEDIUM):
+    from cryptolab.banner import ascii_logo_enabled
+
+    order = (
+        (LOGO_ASCII, LOGO_ASCII_MEDIUM, LOGO_TINY)
+        if ascii_logo_enabled()
+        else (LOGO_LARGE, LOGO_MEDIUM, LOGO_SMALL)
+    )
+    for logo in order:
         if _block_width(logo) <= width and len(logo.splitlines()) <= max_rows:
             return logo
     return LOGO_TINY
@@ -434,7 +435,11 @@ HINTS_SUB = [
 
 
 def render_header(subtitle: str = "", max_logo_rows: int = 99) -> str:
-    """Render header with logo, blank line, and subtitle (uses vlen for ANSI-safe checks)."""
+    """Render header with logo, blank line, and subtitle (uses vlen for ANSI-safe checks).
+
+    Hierarki visual: logo dicetak tebal terang (elemen utama), subtitle
+    diredupkan ke grey (metadata) supaya bedanya langsung terlihat.
+    """
     w = term_width()
     logo = Color.emphasis(center_block(pick_logo(w, max_logo_rows), w))
     if subtitle:
@@ -442,6 +447,6 @@ def render_header(subtitle: str = "", max_logo_rows: int = 99) -> str:
             subtitle = subtitle.split(" · ")[0]
         if vlen(subtitle) > w:
             subtitle = subtitle[: max(w - 1, 0)] + Symbol.ELLIPSIS
-        sub = Color.dim(subtitle.center(w))
+        sub = Color.muted(subtitle.center(w))
         return "\n".join(["", logo, "", sub])
     return "\n".join(["", logo])

@@ -145,6 +145,7 @@ from cryptolab.interactive import (
     term_width,
     term_height,
     HEADER_SUBTITLE,
+    format_subtitle,
     HINTS_MAIN,
     HINTS_SUB,
 )
@@ -282,6 +283,7 @@ __all__ = [
     "term_width",
     "term_height",
     "HEADER_SUBTITLE",
+    "format_subtitle",
     "HINTS_MAIN",
     "HINTS_SUB",
     "format_rail_pattern",

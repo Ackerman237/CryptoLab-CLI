@@ -19,7 +19,37 @@ from typing import Optional
 # ============================================================
 # Dipilih dari pyproject.toml (= 1.2.0) dan src/cryptolab/__init__.py (= 1.2.0).
 APP_VERSION = "1.2.0"
-HEADER_SUBTITLE = f"CRYPTOLAB CLI v{APP_VERSION} · TOOLKIT KRIPTOGRAFI & ENCODING"
+# Rilis terakhir yang sudah dipublikasikan. Selama versi lokal lebih maju
+# (pengembangan belum rilis), subtitle ditandai "(dev)".
+LAST_RELEASE = "1.2.0"
+# Template mentah (belum diisi); jangan dipakai langsung untuk render - pakai
+# format_subtitle(). Yang diekspor sebagai HEADER_SUBTITLE adalah teks final,
+# supaya pemanggil lama seperti render_header(HEADER_SUBTITLE) tetap benar.
+HEADER_SUBTITLE_TEMPLATE = "CRYPTOLAB CLI v{version} · TOOLKIT KRIPTOGRAFI & ENCODING{dev}"
+
+
+def _version_tuple(version: str) -> tuple:
+    parts = []
+    for chunk in version.split("."):
+        digits = "".join(c for c in chunk if c.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def development_build() -> bool:
+    """True bila versi lokal lebih maju dari rilis terakhir (masih pengembangan)."""
+    return _version_tuple(APP_VERSION) > _version_tuple(LAST_RELEASE)
+
+
+def format_subtitle(version: Optional[str] = None, dev: Optional[bool] = None) -> str:
+    """Susun subtitle header, menyertakan "(dev)" saat belum rilis."""
+    version = APP_VERSION if version is None else version
+    dev = development_build() if dev is None else dev
+    return HEADER_SUBTITLE_TEMPLATE.format(version=version, dev=" (dev)" if dev else "")
+
+
+# Teks final (sudah diisi), aman dipakai langsung.
+HEADER_SUBTITLE = format_subtitle()
 
 # ============================================================
 # Logo definitions (block pixel font - CRYPTOLAB)
@@ -103,6 +133,9 @@ GREEN = "\033[32m"
 RED = "\033[31m"
 CYAN = "\033[36m"
 YELLOW = "\033[33m"
+# Nada redup (bright black) untuk hierarki: logo terang, teks sekunder samar.
+GREY = "\033[90m"
+
 
 def paint(text: str, style: str = "") -> str:
     """Apply ANSI style to text."""
@@ -161,21 +194,26 @@ def pick_logo(width: int, max_rows: int = 99) -> str:
     return LOGO_TINY
 
 
+logo_text: Optional[str] = None
+
+
 def render_header(subtitle: str = "", max_logo_rows: int = 99) -> str:
     """Render header with logo, blank line, and subtitle.
 
+    Hierarki visual: logo dicetak tebal terang (elemen utama), sedangkan
+    subtitle diredupkan (metadata) supaya perbedaannya langsung terlihat.
     Garis pemisah tidak dicetak di sini; garisnya cukup di footer agar header
     tetap ringkas dan ruang hasil lebih luas.
     """
     w = term_width()
-    logo = paint(center_block(pick_logo(w, max_logo_rows), w), WHITE)
+    logo = paint(center_block(logo_text or pick_logo(w, max_logo_rows), w), BOLD + WHITE)
     if subtitle:
         if vlen(subtitle) > w:
             # terlalu lebar: buang bagian setelah " · "
             subtitle = subtitle.split(" · ")[0]
         if vlen(subtitle) > w:
             subtitle = subtitle[: max(w - 1, 0)] + "…"
-        sub = paint(subtitle.center(w), DIM)
+        sub = paint(subtitle.center(w), GREY)
         return "\n".join(["", logo, "", sub])
     return "\n".join(["", logo])
 

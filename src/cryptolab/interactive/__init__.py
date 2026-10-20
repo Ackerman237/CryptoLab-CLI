@@ -16,7 +16,7 @@ import sys
 
 from cryptolab.banner import (
     render_header, term_width, term_height, vlen, paint, WHITE, DIM,
-    HEADER_SUBTITLE, APP_VERSION,
+    HEADER_SUBTITLE, APP_VERSION, format_subtitle,
 )
 from cryptolab.ui.ui import render_menu, render_footer, HINTS_MAIN, HINTS_SUB
 from cryptolab.flow import run_action
@@ -167,7 +167,7 @@ def menu_lines(menu, sel, depth):
     # Bila tinggi terlalu kecil untuk logo 5-baris, paksa logo mengecil.
     if h <= 16:
         logo_rows = min(logo_rows, max(h - reserved - menu_min, 1))
-    header = render_header(HEADER_SUBTITLE, max_logo_rows=logo_rows).split("\n")
+    header = render_header(format_subtitle(), max_logo_rows=logo_rows).split("\n")
 
     # avail = tinggi - header - judul - footer - baris kosong
     avail = max(h - len(header) - title_rows - footer_rows - 2, 1)
@@ -262,7 +262,7 @@ def get_main_menu_handlers() -> list:
 
 def get_header_subtitle() -> str:
     """Get the header subtitle."""
-    return HEADER_SUBTITLE
+    return format_subtitle()
 
 
 # ============================================================

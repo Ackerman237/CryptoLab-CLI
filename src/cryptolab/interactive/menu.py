@@ -1,6 +1,6 @@
 """Interactive main menu definition."""
 
-from cryptolab.banner import HEADER_SUBTITLE
+from cryptolab.banner import format_subtitle
 from cryptolab.ui import Menu
 from cryptolab.interactive.handlers import (
     handle_auto_analyze,
@@ -65,4 +65,4 @@ def get_main_menu_handlers() -> list:
 
 def get_header_subtitle() -> str:
     """Get the header subtitle."""
-    return HEADER_SUBTITLE
+    return format_subtitle()

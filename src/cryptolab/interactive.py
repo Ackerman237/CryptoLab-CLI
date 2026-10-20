@@ -29,6 +29,7 @@ from cryptolab.banner import (
     HINTS_SUB,
     center_block,
     APP_VERSION,
+    format_subtitle,
     BOLD,
     warn_weak_hash,
     warn_ecb_mode,
@@ -3140,7 +3141,7 @@ def handle_history() -> None:
 # MENU UTAMA INTERAKTIF
 # ======================================================================
 
-HEADER_SUBTITLE = f"CRYPTOLAB CLI v{APP_VERSION} · TOOLKIT KRIPTOGRAFI & ENCODING"
+HEADER_SUBTITLE = format_subtitle()
 
 
 class Menu:
