@@ -281,69 +281,32 @@ def _is_ctx_fn(fn):
 def run_interactive_menu() -> None:
     """Run the interactive menu loop.
 
-    - Layar alternatif (\033[?1049h) mencegah tumpukan output di scrollback.
+    - Layar alternatif (\\033[?1049h) mencegah tumpukan output di scrollback.
     - Kursor disembunyikan selama menu dan dipulihkan di finally.
-    - Navigasi ↑↓ dengan wrap-around, enter memilih, q keluar, esc kembali.
-    - Item fungsi ctx dipanggil via run_action; handler lama dipanggil langsung.
+    - Tahap 2: bila stdin & stdout keduanya TTY, memakai menu tab kategori
+      (``tab_menu``); selain itu fallback ke menu lama (tidak diubah).
+    - Menu lama: navigasi ↑↓ dengan wrap-around, enter memilih, q keluar,
+      esc kembali. Item fungsi ctx dipanggil via run_action; handler lama
+      dipanggil langsung.
     """
     from cryptolab.ui.layout import alt_screen_enter, alt_screen_exit
     from cryptolab.banner import hide_cursor, show_cursor
 
-    menu = _MAIN_MENU
-    selected = 0
-    n = len(menu.items)
-
     # Hanya gunakan layar alternatif bila stdout adalah TTY.
     use_alt_screen = bool(getattr(sys.stdout, "isatty", lambda: False)())
+    # Tahap 2: menu tab butuh stdin & stdout TTY; selain itu menu lama.
+    use_tab = use_alt_screen and bool(getattr(sys.stdin, "isatty", lambda: False)())
 
     if use_alt_screen:
         alt_screen_enter()
 
     hide_cursor()
     try:
-        while True:
-            draw_menu(menu, selected, 0, True)
-
-            key = read_key()
-            if key is None:
-                continue
-
-            if key == "up":
-                selected = (selected - 1) % n
-            elif key == "down":
-                selected = (selected + 1) % n
-            elif key == "home":
-                selected = 0
-            elif key == "end":
-                selected = n - 1
-            elif key == "enter":
-                label, target = menu.items[selected][:2]
-                if target is _exit_action or target == _exit_action:
-                    return
-                # Panggil fitur: kursor tampil dulu, lalu sembunyi lagi setelah.
-                show_cursor()
-                try:
-                    if _is_ctx_fn(target):
-                        result = run_action(label, target, read_key)
-                        if result == "quit":
-                            return
-                    else:
-                        # Handler lama: panggil langsung.
-                        target()
-                except KeyboardInterrupt:
-                    pass
-                finally:
-                    hide_cursor()
-                # Gambar ulang menu setelah kembali dari aksi.
-                draw_menu(menu, selected, 0, True)
-            elif key == "q":
-                return
-            elif key == "?":
-                # Bantuan: untuk sekarang no-op (dapat dikembangkan).
-                pass
-            elif key == "esc":
-                # Esc di menu utama: tidak melakukan apa-apa (tidak crash).
-                pass
+        if use_tab:
+            from cryptolab.interactive.tab_menu import run_tab_menu
+            run_tab_menu(_run_selected, read_key)
+        else:
+            _run_legacy_menu()
     except KeyboardInterrupt:
         pass
     finally:
@@ -353,3 +316,62 @@ def run_interactive_menu() -> None:
         # Pesan perpisahan (pulihkan perilaku menu lama).
         print("\n  Terima kasih telah menggunakan CryptoLab CLI. Sampai jumpa!\n")
         sys.stdout.flush()
+
+
+def _run_selected(label: str, target) -> bool:
+    """Jalankan satu item menu (ctx atau handler lama).
+
+    Kembalikan True bila aplikasi harus keluar (hasil run_action "quit").
+    Kursor tampil selama fitur berjalan, lalu disembunyikan lagi.
+    """
+    from cryptolab.banner import hide_cursor, show_cursor
+
+    show_cursor()
+    try:
+        if _is_ctx_fn(target):
+            return run_action(label, target, read_key) == "quit"
+        target()
+        return False
+    except KeyboardInterrupt:
+        return False
+    finally:
+        hide_cursor()
+
+
+def _run_legacy_menu() -> None:
+    """Loop menu lama (fallback Tahap 2) - dipertahankan apa adanya."""
+    menu = _MAIN_MENU
+    selected = 0
+    n = len(menu.items)
+
+    while True:
+        draw_menu(menu, selected, 0, True)
+
+        key = read_key()
+        if key is None:
+            continue
+
+        if key == "up":
+            selected = (selected - 1) % n
+        elif key == "down":
+            selected = (selected + 1) % n
+        elif key == "home":
+            selected = 0
+        elif key == "end":
+            selected = n - 1
+        elif key == "enter":
+            label, target = menu.items[selected][:2]
+            if target is _exit_action or target == _exit_action:
+                return
+            if _run_selected(label, target):
+                return
+            # Gambar ulang menu setelah kembali dari aksi.
+            draw_menu(menu, selected, 0, True)
+        elif key == "q":
+            return
+        elif key == "?":
+            # Bantuan: untuk sekarang no-op (dapat dikembangkan).
+            pass
+        elif key == "esc":
+            # Esc di menu utama: tidak melakukan apa-apa (tidak crash).
+            pass
