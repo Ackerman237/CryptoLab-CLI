@@ -361,6 +361,28 @@ class TestEncodingHandlers:
         ctx_dec3 = FakeCtx(["Decode (Binary → Teks)", "01001000##01101001"])
         assert dict(fn_binary(ctx_dec3).rows)["Teks"] == "Hi"
 
+    def test_binary_decode_wrapped_terminal_paste(self):
+        from cryptolab.interactive.handlers.ctx_encoding import fn_binary
+
+        # Exact user scenario: assalamualaikum encoded with '=' custom delimiter
+        # wrapped mid-byte across terminal lines with indentation/spaces
+        wrapped_paste = (
+            "01100001=01110011=01110011=01100001=01101100=01100001=01101101=01110101=01100001=01101100=0110000\n"
+            "           1=01101001=01101011=01110101=01101101"
+        )
+        ctx_dec = FakeCtx(["Decode (Binary → Teks)", wrapped_paste])
+        res = fn_binary(ctx_dec)
+        assert dict(res.rows)["Teks"] == "assalamualaikum"
+
+        # Space-separated binary wrapped mid-byte by terminal line-wrap
+        space_wrapped = (
+            "01100001 01110011 01110011 01100001 01101100 01100001 01101101 01110101 01100001 01101100 0110000\n"
+            "1 01101001 01101011 01110101 01101101"
+        )
+        ctx_dec2 = FakeCtx(["Decode (Binary → Teks)", space_wrapped])
+        res2 = fn_binary(ctx_dec2)
+        assert dict(res2.rows)["Teks"] == "assalamualaikum"
+
 
 class TestHashHandler:
     def test_hash_sha256(self):

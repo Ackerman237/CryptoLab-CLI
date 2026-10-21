@@ -56,22 +56,40 @@ def _rule(w):
 
 
 def _drain_extra_lines():
-    """Buang sisa baris di buffer stdin setelah ``input()``.
+    """No-op untuk kompatibilitas. Sisa baris sekarang ditangani langsung di _read_line."""
+    return 0
 
-    Saat pengguna menempel (paste) teks multi-baris, ``input()`` hanya
-    mengembalikan baris pertama; sisanya tertinggal di buffer dan akan
-    terbaca sebagai jawaban untuk prompt-prompt berikutnya - inilah penyebab
-    "input saya sendiri muncul di pertanyaan berikutnya".
 
-    Mengembalikan jumlah baris tambahan yang dibuang (0 bila tidak ada),
-    supaya pemanggil bisa memberi tahu pengguna alih-alih memotong diam-diam.
+def _stdin_is_tty() -> bool:
+    """Apakah stdin berjalan di terminal interaktif (bukan pipe/redirect)."""
+    try:
+        return bool(sys.stdin and sys.stdin.isatty())
+    except (AttributeError, ValueError):
+        return False
 
-    Catatan: hanya relevan untuk input interaktif (TTY). Saat stdin adalah
-    pipe/redirect, penanganannya dilakukan oleh ``_read_line`` yang membaca
-    dari iterator baris, bukan di sini.
+
+def _read_line(prompt: str, secret: bool) -> str:
+    """Baca input pengguna, mendukung paste teks panjang/multi-baris.
+
+    - TTY: Bila pengguna menempel (paste) teks multi-baris atau teks panjang
+      yang terpotong akibat terminal line-wrap, ``input()`` hanya membaca baris
+      pertama sementara karakter kelanjutannya tertinggal di buffer stdin.
+      Karakter-karakter tersebut diambil seketika dari buffer stdin dan
+      digabungkan, sehingga teks paste utuh dan tidak ada sisa karakter yang
+      bocor ke prompt berikutnya.
+    - Non-TTY (pipe/redirect): baca langsung dari ``sys.stdin`` per baris.
     """
+    if secret:
+        return getpass.getpass(prompt)
     if not _stdin_is_tty():
-        return 0
+        sys.stdout.write(prompt)
+        sys.stdout.flush()
+        line = sys.stdin.readline()
+        if line == "":
+            raise EOFError
+        return line.rstrip("\r\n")
+
+    first_line = input(prompt)
     chars = []
     try:
         import msvcrt                          # Windows
@@ -91,40 +109,18 @@ def _drain_extra_lines():
                     break
                 chars.append(ch)
         except (OSError, ValueError):
-            return 0
+            pass
+
     if not chars:
-        return 0
-    # Hitung baris: setiap "\n" menandai satu baris tambahan yang dibuang.
-    text = "".join(chars).replace("\r\n", "\n").replace("\r", "\n")
-    return max(text.count("\n"), 1 if text.strip() else 0)
+        return first_line
 
+    extra_text = "".join(chars).replace("\r\n", "\n").replace("\r", "\n")
+    if extra_text.startswith("\n"):
+        extra_text = extra_text[1:]
 
-def _stdin_is_tty() -> bool:
-    """Apakah stdin berjalan di terminal interaktif (bukan pipe/redirect)."""
-    try:
-        return bool(sys.stdin and sys.stdin.isatty())
-    except (AttributeError, ValueError):
-        return False
-
-
-def _read_line(prompt: str, secret: bool) -> str:
-    """Baca satu baris input, aman untuk TTY maupun pipe/redirect.
-
-    - TTY: ``input()``/``getpass()`` seperti biasa.
-    - Non-TTY (pipe/redirect): baca langsung dari ``sys.stdin`` per baris,
-      supaya sisa baris setelah baris pertama TIDAK ikut terbaca oleh prompt
-      berikutnya (perilaku lama: seluruh isi pipe "bocor" ke prompt lain).
-    """
-    if secret:
-        return getpass.getpass(prompt)
-    if not _stdin_is_tty():
-        sys.stdout.write(prompt)
-        sys.stdout.flush()
-        line = sys.stdin.readline()
-        if line == "":
-            raise EOFError
-        return line.rstrip("\r\n")
-    return input(prompt)
+    if extra_text:
+        return first_line + "\n" + extra_text
+    return first_line
 
 
 def header_lines(title, hint="ctrl+c batal"):
@@ -162,14 +158,7 @@ class Ctx:
         print(" " * MARGIN + paint(f"✗ {msg}", RED))
 
     def _read(self, label, default, cast, secret):
-        """Baca satu input dengan validasi dan tanya ulang.
-
-        Menangani paste multi-baris: ``input()`` hanya mengambil satu baris,
-        sisanya tertinggal di buffer stdin dan akan "terketik sendiri" pada
-        prompt berikutnya. Karena itu sisa buffer dibuang (drain) setelah
-        baris pertama dibaca, dan bila yang ditempel ternyata multi-baris kita
-        beri tahu pengguna alih-alih diam-diam memotong datanya.
-        """
+        """Baca satu input dengan validasi dan tanya ulang."""
         suffix = f" [{default}]" if default is not None else ""
         prompt = " " * MARGIN + f"{label}{suffix} › "
         while True:
@@ -177,18 +166,11 @@ class Ctx:
                 raw = _read_line(prompt, secret).strip()
             except (KeyboardInterrupt, EOFError):
                 raise Cancelled()
-            extra = "" if secret else _drain_extra_lines()
             if raw == "":
                 if default is None:
                     self._error("tidak boleh kosong")
                     continue
                 return default
-            if extra:
-                # Paste multi-baris: jangan potong diam-diam.
-                self._error(
-                    f"input berisi {extra + 1} baris - hanya baris pertama dipakai "
-                    "(gabungkan jadi satu baris atau pakai tanpa Enter)"
-                )
             try:
                 return cast(raw)
             except ValueError as e:

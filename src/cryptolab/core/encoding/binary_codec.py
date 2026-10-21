@@ -92,6 +92,12 @@ def binary_decode(binary_str: str, encoding: str = "utf-8") -> str:
                     f"Token ke-{idx} ('{token}') mengandung karakter bukan biner: {', '.join(sorted(invalid_chars))}"
                 )
             if len(token) != 8:
+                # Bila token terpotong akibat line wrap terminal saat copy-paste,
+                # tapi total bit kelipatan 8, satukan kembali dan decode secara mulus.
+                all_bits = "".join(tokens)
+                if len(all_bits) % 8 == 0:
+                    chunks = [all_bits[i : i + 8] for i in range(0, len(all_bits), 8)]
+                    return _binary_chunks_to_text(chunks, encoding)
                 raise DecodingError(
                     f"Token ke-{idx} ('{token}') memiliki panjang {len(token)} bit (harus 8-bit per byte)."
                 )
