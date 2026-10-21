@@ -42,9 +42,18 @@ class FakeCtx:
 @pytest.fixture(autouse=True)
 def no_history(monkeypatch):
     """Disable history logging during tests."""
-    from cryptolab.interactive.handlers import ctx_classical, ctx_analysis
+    from cryptolab.interactive.handlers import (
+        ctx_classical,
+        ctx_analysis,
+        ctx_asymmetric,
+        ctx_encoding,
+        ctx_hashing,
+    )
     monkeypatch.setattr(ctx_classical, "log_history", lambda *a, **k: True)
     monkeypatch.setattr(ctx_analysis, "log_history", lambda *a, **k: True)
+    monkeypatch.setattr(ctx_asymmetric, "log_history", lambda *a, **k: True)
+    monkeypatch.setattr(ctx_encoding, "log_history", lambda *a, **k: True)
+    monkeypatch.setattr(ctx_hashing, "log_history", lambda *a, **k: True)
 
 
 class TestCaesarHandler:
@@ -190,4 +199,110 @@ class TestAutoAnalyzeHandler:
         rows_dict = dict(res.rows)
         assert "Hasil" in rows_dict
         assert len(rows_dict["Hasil"]) > 0
+
+
+class TestAsymmetricHandler:
+    def test_rsa_keygen_sign_verify_base64(self):
+        from cryptolab.interactive.handlers.ctx_asymmetric import fn_rsa
+
+        # 1. KeyGen 1024-bit for fast testing
+        ctx_kg = FakeCtx(["Generate Keypair", "1024"])
+        res_kg = fn_rsa(ctx_kg)
+        rows_kg = dict(res_kg.rows)
+        pub_pem = rows_kg["Public Key"]
+        priv_pem = rows_kg["Private Key"]
+
+        # 2. Sign with base64 encoding
+        ctx_sign = FakeCtx(["Tanda Tangan", "Pesan Rahasia", priv_pem, "PSS", "SHA256", "base64"])
+        res_sign = fn_rsa(ctx_sign)
+        rows_sign = dict(res_sign.rows)
+        sig_b64 = rows_sign["Tanda Tangan"]
+
+        # 3. Verify with base64 encoding (tests the base64 verify fix)
+        ctx_verify = FakeCtx(["Verifikasi", "Pesan Rahasia", sig_b64, pub_pem, "PSS", "SHA256", "base64"])
+        res_verify = fn_rsa(ctx_verify)
+        rows_verify = dict(res_verify.rows)
+        assert "VALID" in rows_verify["Status"]
+
+    def test_rsa_encrypt_decrypt(self):
+        from cryptolab.interactive.handlers.ctx_asymmetric import fn_rsa
+
+        # KeyGen 1024-bit
+        ctx_kg = FakeCtx(["Generate Keypair", "1024"])
+        res_kg = fn_rsa(ctx_kg)
+        pub_pem = dict(res_kg.rows)["Public Key"]
+        priv_pem = dict(res_kg.rows)["Private Key"]
+
+        # Encrypt
+        ctx_enc = FakeCtx(["Enkripsi", "Secret Data", pub_pem, "OAEP", "SHA256", "hex"])
+        res_enc = fn_rsa(ctx_enc)
+        ct_hex = dict(res_enc.rows)["Ciphertext"]
+
+        # Decrypt
+        ctx_dec = FakeCtx(["Dekripsi", ct_hex, priv_pem, "OAEP", "SHA256", "hex"])
+        res_dec = fn_rsa(ctx_dec)
+        assert dict(res_dec.rows)["Plaintext"] == "Secret Data"
+
+    def test_dh_exchange(self):
+        from cryptolab.interactive.handlers.ctx_asymmetric import fn_dh
+
+        ctx = FakeCtx(["2048", "Ya", 32, "SHA256"])
+        res = fn_dh(ctx)
+        rows = dict(res.rows)
+        assert "Shared Secret" in rows
+        assert "Derived Key" in rows
+
+
+class TestEncodingHandlers:
+    def test_base64_roundtrip(self):
+        from cryptolab.interactive.handlers.ctx_encoding import fn_base64
+
+        ctx_enc = FakeCtx(["Encode (Teks → Base64)", "CryptoLab"])
+        res_enc = fn_base64(ctx_enc)
+        b64 = dict(res_enc.rows)["Base64"]
+
+        ctx_dec = FakeCtx(["Decode (Base64 → Teks)", b64])
+        res_dec = fn_base64(ctx_dec)
+        assert dict(res_dec.rows)["Teks"] == "CryptoLab"
+
+    def test_hex_roundtrip(self):
+        from cryptolab.interactive.handlers.ctx_encoding import fn_hex
+
+        ctx_enc = FakeCtx(["Encode (Teks → Hex)", "CryptoLab"])
+        res_enc = fn_hex(ctx_enc)
+        hx = dict(res_enc.rows)["Hex"]
+
+        ctx_dec = FakeCtx(["Decode (Hex → Teks)", hx])
+        res_dec = fn_hex(ctx_dec)
+        assert dict(res_dec.rows)["Teks"] == "CryptoLab"
+
+    def test_binary_roundtrip(self):
+        from cryptolab.interactive.handlers.ctx_encoding import fn_binary
+
+        ctx_enc = FakeCtx(["Encode (Teks → Binary)", "AB"])
+        res_enc = fn_binary(ctx_enc)
+        bin_str = dict(res_enc.rows)["Binary"]
+
+        ctx_dec = FakeCtx(["Decode (Binary → Teks)", bin_str])
+        res_dec = fn_binary(ctx_dec)
+        assert dict(res_dec.rows)["Teks"] == "AB"
+
+
+class TestHashHandler:
+    def test_hash_sha256(self):
+        from cryptolab.interactive.handlers.ctx_hashing import fn_hash
+
+        ctx = FakeCtx(["SHA-256", "Halo Dunia"])
+        res = fn_hash(ctx)
+        assert "Hash" in dict(res.rows)
+        assert len(dict(res.rows)["Hash"]) == 64
+
+    def test_hash_hmac_sha256(self):
+        from cryptolab.interactive.handlers.ctx_hashing import fn_hash
+
+        ctx = FakeCtx(["HMAC-SHA256", "Data", "secret-key"])
+        res = fn_hash(ctx)
+        assert "HMAC" in dict(res.rows)
+        assert len(dict(res.rows)["HMAC"]) == 64
+
 
