@@ -98,10 +98,11 @@ def fn_rsa(ctx):
             lambda: rsa_verify(message, signature, pub_key, padding=padding, hash_algo=hash_algo, encoding=encoding),
         )
         log_history("RSA Verify", message, res.output_text, {"padding": padding})
+        note = "; ".join(res.reasons) if getattr(res, "reasons", None) else ""
         return Result([
             ("Pesan", message),
-            ("Hasil", res.output_text),
-        ] + [(r, "") for r in res.reasons])
+            ("Status", res.output_text),
+        ], note=note)
 
 
 fn_rsa._ctx_fn = True

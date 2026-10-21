@@ -33,13 +33,18 @@ def fn_caesar(ctx):
         best = find_best_candidate(candidates)
         rows = [("Teks asli", text)]
         if best:
-            rows.append(("Shift terbaik", str(best.shift)))
-            rows.append(("Hasil", best.plaintext))
-            rows.append(("Skor", f"{best.score:.2f}"))
-        for c in (candidates or [])[:5]:
-            rows.append((f"Shift {c.shift:>2}", f"{c.score:.2f} | {c.plaintext[:40]}"))
-        log_history("Caesar BruteForce", text, best.plaintext if best else "-")
-        return Result(rows)
+            rows.append(("Shift terbaik", f"Shift {best.shift:02d}"))
+            rows.append(("Hasil terbaik", best.text))
+            rows.append(("Skor", f"{best.score:.1f}/100 ({best.score_level})"))
+            if best.flag_detected:
+                rows.append(("Flag", "Pola format flag terdeteksi!"))
+        for c in (candidates or []):
+            is_best = bool(best and c.shift == best.shift)
+            marker = " ★" if is_best else ""
+            flag = " [FLAG]" if c.flag_detected else ""
+            rows.append((f"Shift {c.shift:02d}{marker}", f"{c.score:5.1f} | {c.text}{flag}"))
+        log_history("Caesar Brute Force", text, best.text if best else "-", {"best_shift": best.shift if best else None})
+        return Result(rows, note="Gunakan panah ↑↓ untuk menggulir seluruh 26 shift kandidat.")
 
 
 fn_caesar._ctx_fn = True
@@ -51,11 +56,20 @@ def _validate_shift(n):
     return n
 
 
+def _validate_vigenere_key(k: str) -> str:
+    cleaned = k.strip()
+    if not cleaned:
+        raise ValueError("kunci tidak boleh kosong")
+    if not all(c.isalpha() for c in cleaned):
+        raise ValueError("kunci hanya boleh berisi huruf alfabet (A-Z/a-z)")
+    return cleaned
+
+
 def fn_vigenere(ctx):
     """Vigenere Cipher: enkripsi atau dekripsi."""
     op = ctx.choose("Operasi", ["Enkripsi", "Dekripsi"])
     text = ctx.ask("Teks")
-    key = ctx.ask("Kunci (huruf saja)")
+    key = ctx.ask("Kunci (huruf saja)", cast=_validate_vigenere_key)
 
     if op == "Enkripsi":
         result = ctx.work("Mengenkripsi Vigenere", lambda: vigenere_encrypt(text, key))
@@ -68,3 +82,4 @@ def fn_vigenere(ctx):
 
 
 fn_vigenere._ctx_fn = True
+

@@ -381,8 +381,18 @@ def rsa_verify(
     data = _to_bytes(message, "Message")
     public_key = rsa_load_public_key(public_key_pem)
 
-    clean_sig = _clean_hex(signature_hex)
-    signature = bytes.fromhex(clean_sig)
+    if encoding.lower() == "base64":
+        import base64
+        try:
+            signature = base64.b64decode(signature_hex)
+        except Exception as e:
+            raise DecodingError(f"Invalid base64 signature: {e}")
+    else:
+        clean_sig = _clean_hex(signature_hex)
+        try:
+            signature = bytes.fromhex(clean_sig)
+        except ValueError as e:
+            raise DecodingError(f"Invalid hex signature: {e}")
 
     hash_obj = SHA256.new(data) if hash_algo.upper() == "SHA256" else SHA512.new(data)
 
