@@ -52,9 +52,54 @@ def fn_binary(ctx):
     op = ctx.choose("Operasi", ["Encode (Teks → Binary)", "Decode (Binary → Teks)"])
     data = ctx.ask("Teks")
     if op.startswith("Encode"):
-        out = ctx.work("Mengkode Binary", lambda: binary_encode(data))
-        log_history("Binary Encode", data, out)
-        return Result([("Input", data), ("Binary", out)])
+        delim_options = [
+            "Spasi (' ')",
+            "Strip ('-')",
+            "Titik ('.')",
+            "Koma (',')",
+            "Tanpa pemisah",
+            "Custom (input sendiri)",
+        ]
+        choice = ctx.choose("Pemisah (delimiter)", delim_options, default=1)
+        if choice.startswith("Spasi"):
+            delim = " "
+        elif choice.startswith("Strip"):
+            delim = "-"
+        elif choice.startswith("Titik"):
+            delim = "."
+        elif choice.startswith("Koma"):
+            delim = ","
+        elif choice.startswith("Tanpa"):
+            delim = ""
+        else:
+            def _validate_delimiter(raw: str) -> str:
+                if not raw:
+                    raise ValueError("Pemisah tidak boleh kosong")
+                if any(ch in "01" for ch in raw):
+                    raise ValueError("Pemisah tidak boleh mengandung angka 0 atau 1")
+                if any(ch.isalnum() for ch in raw):
+                    raise ValueError("Pemisah harus berupa simbol atau spasi (tanpa huruf/angka)")
+                if len(raw) > 5:
+                    raise ValueError("Pemisah maksimal 5 karakter")
+                return raw
+
+            delim = ctx.ask(
+                "Pemisah kustom (maks 5 simbol, tanpa angka 0 atau 1)",
+                cast=_validate_delimiter,
+            )
+
+        out = ctx.work("Mengkode Binary", lambda: binary_encode(data, delimiter=delim))
+        log_history("Binary Encode", data, out, {"delimiter": delim})
+        delim_label = (
+            "Tanpa pemisah"
+            if delim == ""
+            else ("Spasi (' ')" if delim == " " else repr(delim))
+        )
+        return Result([
+            ("Input", data),
+            ("Pemisah", delim_label),
+            ("Binary", out),
+        ])
     else:
         out = ctx.work("Mendekode Binary", lambda: binary_decode(data))
         log_history("Binary Decode", data, out)

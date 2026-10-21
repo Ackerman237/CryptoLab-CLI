@@ -27,11 +27,17 @@ class FakeCtx:
         return ans
 
     def ask(self, label, default=None, cast=str, secret=False):
-        raw = next(self._answers)
-        if raw == "" and default is not None:
-            ans = default
-        else:
-            ans = cast(raw)
+        while True:
+            raw = next(self._answers)
+            if raw == "" and default is not None:
+                ans = default
+                break
+            try:
+                ans = cast(raw)
+                break
+            except ValueError:
+                self.inputs.append((label, f"<invalid: {raw}>"))
+                continue
         self.inputs.append((label, str(ans)))
         return ans
 
@@ -279,13 +285,81 @@ class TestEncodingHandlers:
     def test_binary_roundtrip(self):
         from cryptolab.interactive.handlers.ctx_encoding import fn_binary
 
-        ctx_enc = FakeCtx(["Encode (Teks → Binary)", "AB"])
+        ctx_enc = FakeCtx(["Encode (Teks → Binary)", "AB", "Spasi (' ')"])
         res_enc = fn_binary(ctx_enc)
         bin_str = dict(res_enc.rows)["Binary"]
+        assert bin_str == "01000001 01000010"
+        assert dict(res_enc.rows)["Pemisah"] == "Spasi (' ')"
 
         ctx_dec = FakeCtx(["Decode (Binary → Teks)", bin_str])
         res_dec = fn_binary(ctx_dec)
         assert dict(res_dec.rows)["Teks"] == "AB"
+
+    def test_binary_delimiters_preset(self):
+        from cryptolab.interactive.handlers.ctx_encoding import fn_binary
+
+        # Strip delimiter
+        ctx_dash = FakeCtx(["Encode (Teks → Binary)", "Hi", "Strip ('-')"])
+        res_dash = fn_binary(ctx_dash)
+        assert dict(res_dash.rows)["Binary"] == "01001000-01101001"
+        assert dict(res_dash.rows)["Pemisah"] == "'-'"
+
+        # Decode dash separated string
+        ctx_dec = FakeCtx(["Decode (Binary → Teks)", "01001000-01101001"])
+        assert dict(fn_binary(ctx_dec).rows)["Teks"] == "Hi"
+
+        # Dot delimiter
+        ctx_dot = FakeCtx(["Encode (Teks → Binary)", "Hi", "Titik ('.')"])
+        res_dot = fn_binary(ctx_dot)
+        assert dict(res_dot.rows)["Binary"] == "01001000.01101001"
+        assert dict(res_dot.rows)["Pemisah"] == "'.'"
+
+        # Comma delimiter
+        ctx_comma = FakeCtx(["Encode (Teks → Binary)", "Hi", "Koma (',')"])
+        res_comma = fn_binary(ctx_comma)
+        assert dict(res_comma.rows)["Binary"] == "01001000,01101001"
+
+        # Tanpa pemisah
+        ctx_none = FakeCtx(["Encode (Teks → Binary)", "Hi", "Tanpa pemisah"])
+        res_none = fn_binary(ctx_none)
+        assert dict(res_none.rows)["Binary"] == "0100100001101001"
+        assert dict(res_none.rows)["Pemisah"] == "Tanpa pemisah"
+
+    def test_binary_custom_delimiter_and_validation(self):
+        from cryptolab.interactive.handlers.ctx_encoding import fn_binary
+
+        # Custom delimiter with retry on invalid inputs (0, 1, alphanumeric)
+        ctx_custom = FakeCtx([
+            "Encode (Teks → Binary)",
+            "OK",
+            "Custom (input sendiri)",
+            "0",         # Invalid: contains 0 (data bit) -> prompts re-input
+            "1",         # Invalid: contains 1 (data bit) -> prompts re-input
+            "sep",       # Invalid: letters -> prompts re-input
+            "|",         # Valid custom delimiter!
+        ])
+        res_custom = fn_binary(ctx_custom)
+        assert dict(res_custom.rows)["Binary"] == "01001111|01001011"
+        assert dict(res_custom.rows)["Pemisah"] == "'|'"
+
+        # Decode custom delimiter ignores '|' and decodes cleanly
+        ctx_dec = FakeCtx(["Decode (Binary → Teks)", "01001111|01001011"])
+        assert dict(fn_binary(ctx_dec).rows)["Teks"] == "OK"
+
+    def test_binary_decode_ignores_non_binary_delimiters(self):
+        from cryptolab.interactive.handlers.ctx_encoding import fn_binary
+
+        # Mixed spaces, symbols, dashes
+        ctx_dec = FakeCtx(["Decode (Binary → Teks)", "01001000 - 01101001"])
+        assert dict(fn_binary(ctx_dec).rows)["Teks"] == "Hi"
+
+        # Comma with space
+        ctx_dec2 = FakeCtx(["Decode (Binary → Teks)", "01001000, 01101001"])
+        assert dict(fn_binary(ctx_dec2).rows)["Teks"] == "Hi"
+
+        # Hash custom separator
+        ctx_dec3 = FakeCtx(["Decode (Binary → Teks)", "01001000##01101001"])
+        assert dict(fn_binary(ctx_dec3).rows)["Teks"] == "Hi"
 
 
 class TestHashHandler:
